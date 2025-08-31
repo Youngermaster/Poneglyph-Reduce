@@ -1,7 +1,7 @@
-import base64, json, sys, time
+import base64, json, sys, time, os
 import urllib.request
 
-MASTER = "http://localhost:8080"
+MASTER = os.getenv("MASTER", "http://localhost:8080")
 
 def b64(path):
     with open(path, "rb") as f:
