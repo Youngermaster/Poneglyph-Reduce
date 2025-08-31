@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  master:
+    build: ./Road-Poneglyph
+    container_name: road-poneglyph
+    ports:
+      - "8080:8080"
+
+  worker:
+    build: ./Poneglyph
+    depends_on:
+      - master
+    environment:
+      - PONEGLYPH_MASTER_URL=http://master:8080
+
+  client:
+    build: ./client
+    depends_on:
+      - master
+      - worker
+    environment:
+      - MASTER=http://master:8080
