@@ -90,6 +90,77 @@ docker compose run --rm client
 
 > The spec explicitly requires defining **Client ↔ Master** and **Master ↔ Workers** communications; this API covers the required flows.&#x20;
 
+### 6.1) Inspecting jobs & results
+
+After the stack is up and the client has submitted the WordCount job:
+
+```bash
+# List jobs (IDs)
+curl -s http://localhost:8080/api/jobs | jq .
+
+# Check status (state, completed tasks)
+curl -s "http://localhost:8080/api/jobs/status?job_id=wordcount-001" | jq .
+
+# Fetch final result (once state == SUCCEEDED)
+curl -s "http://localhost:8080/api/jobs/result?job_id=wordcount-001"
+```
+
+**Expected (example)** for the default WordCount input repeated 10 times:
+
+```
+blue    10
+fish    40
+one     10
+red     10
+two     10
+```
+
+> You can also use Thunder Client / Postman:
+>
+> * **GET** `http://localhost:8080/api/jobs`
+> * **GET** `http://localhost:8080/api/jobs/status?job_id=wordcount-001`
+> * **GET** `http://localhost:8080/api/jobs/result?job_id=wordcount-001`
+
+To re-run the example job:
+
+```bash
+docker compose run --rm client
+# then fetch result again:
+curl -s "http://localhost:8080/api/jobs/result?job_id=wordcount-001"
+```
+
+> Note: the bundled client uses a fixed `job_id=wordcount-001`. Re-running the client overwrites that job’s scripts and input. For multiple concurrent jobs, make the client read `JOB_ID` from an env var or argument.
+
+### 6.2) Optional: debug endpoint
+
+If you enabled the optional debug endpoint in the master (as suggested in the docs), you can inspect per-partition sizes:
+
+```bash
+# Debug: partition sizes for the job
+curl -s "http://localhost:8080/api/jobs/debug?job_id=wordcount-001" | jq .
+```
+
+**Example output**:
+
+```json
+{
+  "state": "SUCCEEDED",
+  "partition_sizes": [123, 117]
+}
+```
+
+> If you see just `["wordcount-001"]`, you’re likely calling **`/api/jobs`** (job list), not `/api/jobs/debug`.
+
+### 6.3) Useful logs
+
+```bash
+# Master logs (task creation, shuffle, reducers finishing)
+docker logs -f road-poneglyph
+
+# Worker logs (MAP/REDUCE execution; warnings if mapper/reducer produced 0 lines)
+docker compose logs -f worker
+```
+
 ## 7) Example job (WordCount)
 
 **Mapper (`map.py`)**: tokenize to lowercase words and emit `word\t1`.
@@ -141,6 +212,16 @@ docker logs -f road-poneglyph
 
 # Re-run the client (submits WordCount and prints result):
 docker compose run --rm client
+```
+
+## 13) Reset / cleanup
+
+```bash
+# Stop and remove containers
+docker compose down
+
+# Full reset (containers + volumes/networks)
+docker compose down -v
 ```
 
 **References**
