@@ -1,19 +1,21 @@
 # syntax=docker/dockerfile:1
 
-FROM eclipse-temurin:17-jdk AS build
-WORKDIR /app
+# Usamos gradle preinstalado
+FROM gradle:8.7.0-jdk17 AS build
+WORKDIR /home/gradle/project
 
-# copia wrapper y build files primero (layer cache)
-COPY gradlew gradle/ build.gradle settings.gradle ./
-# copia código
+# Copiamos primero los archivos de build (cache friendly)
+COPY build.gradle settings.gradle ./
+# Luego el código
 COPY src ./src
 
-# build distribución (bin + libs)
-RUN ./gradlew --no-daemon clean installDist
+# Construcción distribución (bin + libs)
+RUN gradle --no-daemon clean installDist
 
 FROM eclipse-temurin:17-jre
 WORKDIR /app
-COPY --from=build /app/build/install/road-poneglyph /app
+# Gracias a settings.gradle, el nombre de la dist es "road-poneglyph"
+COPY --from=build /home/gradle/project/build/install/road-poneglyph /app
 EXPOSE 8080
 # script generado por 'installDist' según settings.gradle
 CMD ["./bin/road-poneglyph"]

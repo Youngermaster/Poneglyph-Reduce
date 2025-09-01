@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   master:
     build: ./Road-Poneglyph
@@ -12,12 +10,12 @@ services:
     depends_on:
       - master
     environment:
-      - PONEGLYPH_MASTER_URL=http://master:8080
+      PONEGLYPH_MASTER_URL: http://master:8080
 
   client:
-    build: ./client
+    build: ./Clover
     depends_on:
       - master
       - worker
     environment:
-      - MASTER=http://master:8080
+      MASTER: http://master:8080
