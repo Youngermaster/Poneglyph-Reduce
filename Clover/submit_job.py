@@ -21,7 +21,7 @@ if __name__ == "__main__":
     # Ejemplo WordCount
     map_b64 = b64("map.py")
     reduce_b64 = b64("reduce.py")
-    input_text = "one fish two fish\nred fish blue fish\n" * 10
+    input_text = "one fish two fish\nred fish blue fish\n" * 200
 
     job = {
         "job_id": "wordcount-001",

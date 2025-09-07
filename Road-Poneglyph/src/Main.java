@@ -283,29 +283,42 @@ public class Main {
             if ("MAP".equals(type)) {
                 String kv = j.get("kv_lines").getAsString(); // "k\tv\n..."
                 // Shuffle: agrupar por partición
+                int added = 0;
                 for (String line : kv.split("\n")) {
                     if (line.isBlank()) continue;
-                    String[] kvp = line.split("\t");
+                    String[] kvp = line.split("\t", 2);  // <--- clave: limit 2
                     if (kvp.length < 2) continue;
                     String k = kvp[0];
                     String v = kvp[1];
                     int p = partitionOf(k, ctx.spec.reducers);
                     ctx.partitionKV.get(p).add(k + "\t" + v);
+                    added++;
                 }
+                System.out.println("[MAP COMPLETE] job=" + jobId + " task=" + taskId + " kvAdded=" + added);
                 ctx.completedMaps++;
+
                 // Cuando terminan todos los MAP: crear REDUCE tasks
                 if (ctx.completedMaps == ctx.mapTasks.size()) {
+                    for (int i = 0; i < ctx.spec.reducers; i++) {
+                        int sz = ctx.partitionKV.get(i).size();
+                        System.out.println("[SHUFFLE] job=" + jobId + " partition=" + i + " size=" + sz);
+                    }
                     int rIx = 0;
+                    ctx.reduceTasks.clear();
                     for (Map.Entry<Integer, List<String>> e : ctx.partitionKV.entrySet()) {
+                        if (e.getValue().isEmpty()) continue; // no reducers vacíos
                         Task rt = new Task();
                         rt.type = TaskType.REDUCE;
-                        rt.taskId = "reduce-" + rIx;
+                        rt.taskId = "reduce-" + (rIx++);
                         rt.jobId = jobId;
                         rt.partitionIndex = e.getKey();
                         rt.kvLinesForReduce = e.getValue();
                         ctx.reduceTasks.add(rt);
                         pendingTasks.offer(rt);
-                        rIx++;
+                    }
+                    if (ctx.reduceTasks.isEmpty()) {
+                        System.out.println("[REDUCE BYPASS] No data to reduce for job=" + jobId);
+                        ctx.state = JobState.SUCCEEDED;
                     }
                 }
                 respondJson(ex, 200, Map.of("ack", true));
@@ -316,6 +329,22 @@ public class Main {
                 ctx.finalOutput += out + (out.endsWith("\n") ? "" : "\n");
                 if (ctx.completedReduces == ctx.spec.reducers) {
                     ctx.state = JobState.SUCCEEDED;
+                }
+                if (ctx.completedReduces == ctx.reduceTasks.size()) {
+                    ctx.state = JobState.SUCCEEDED;
+
+                    // --- S3 local: persistimos el resultado ---
+                    try {
+                        File dir = new File("out");
+                        if (!dir.exists()) dir.mkdirs();
+                        File f = new File(dir, ctx.spec.job_id + ".txt");
+                        try (FileOutputStream fos = new FileOutputStream(f, false)) {
+                            fos.write(ctx.finalOutput.getBytes(StandardCharsets.UTF_8));
+                        }
+                        System.out.println("[RESULT STORED] " + f.getAbsolutePath());
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
                 respondJson(ex, 200, Map.of("ack", true));
             }

@@ -1,11 +1,11 @@
-#include <iostream>
-#include <string>
-#include <vector>
-#include <cstdlib>
-#include <cstdio>
-#include <sstream>
-#include <thread>
 #include <chrono>
+#include <cstdio>
+#include <cstdlib>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <thread>
+#include <vector>
 
 // Pequeña utilidad para ejecutar comandos del SO y capturar salida (requiere 'curl' y 'python3' instalados)
 std::string run(const std::string &cmd) {
@@ -39,30 +39,65 @@ void save_file(const std::string &path, const std::string &data) {
 // Naive JSON getters (busca "campo":"valor" en respuestas conocidas v1)
 std::string get_json_str(const std::string &j, const std::string &key) {
     std::string pat = "\"" + key + "\":";
-    auto p = j.find(pat);
+    size_t p = j.find(pat);
     if (p == std::string::npos) return "";
     p += pat.size();
-    // saltar espacios
     while (p < j.size() && (j[p] == ' ')) p++;
+
+    // String
     if (p < j.size() && j[p] == '\"') {
         p++;
         std::string val;
-        while (p < j.size() && j[p] != '\"') {
-            if (j[p] == '\\' && p + 1 < j.size()) {
-                val.push_back(j[p + 1]);
-                p += 2;
-                continue;
+        while (p < j.size()) {
+            char c = j[p++];
+            if (c == '\\') {
+                if (p >= j.size()) break;
+                char e = j[p++]; // escape code
+                switch (e) {
+                    case 'n': val.push_back('\n');
+                        break;
+                    case 't': val.push_back('\t');
+                        break;
+                    case 'r': val.push_back('\r');
+                        break;
+                    case 'b': val.push_back('\b');
+                        break;
+                    case 'f': val.push_back('\f');
+                        break;
+                    case '\\': val.push_back('\\');
+                        break;
+                    case '\"': val.push_back('\"');
+                        break;
+                    case 'u':
+                        // ignora \uXXXX (no lo necesitamos aquí)
+                        // salta hasta 4 hex si están
+                        for (int k = 0; k < 4 && p < j.size(); ++k) {
+                            if (!isxdigit((unsigned char) j[p])) break;
+                            ++p;
+                        }
+                        break;
+                    default:
+                        // escape desconocido: conserva el char literal
+                        val.push_back(e);
+                        break;
+                }
+            } else if (c == '\"') {
+                break; // fin de string
+            } else {
+                val.push_back(c);
             }
-            val.push_back(j[p++]);
         }
         return val;
-    } else {
-        // número
-        std::string val;
-        while (p < j.size() && (isdigit(j[p]) || j[p] == '-')) val.push_back(j[p++]);
-        return val;
     }
+
+    // Número simple
+    std::string val;
+    while (p < j.size() && (isdigit((unsigned char) j[p]) || j[p] == '-' || j[p] == '.')) {
+        val.push_back(j[p++]);
+    }
+    return val;
 }
+
 
 int main() {
     std::string master = std::getenv("PONEGLYPH_MASTER_URL")
@@ -97,8 +132,15 @@ int main() {
             // Ejecutar: python3 map.py input.txt > map.out
             run("python3 map.py input.txt > map.out");
             // Leer salida
+            // ... dentro del bloque MAP, antes de enviar /api/tasks/complete
+            // Leer salida
             std::string kv = run("cat map.out");
-            // Reportar
+
+            // Aviso si el mapper no produjo nada
+            if (kv.empty()) {
+                std::cerr << "[WARN] Mapper produced 0 lines for task " << taskId << std::endl;
+            }
+
             std::ostringstream payload;
             payload << "{"
                     << "\"worker_id\":\"" << workerId << "\","
@@ -106,11 +148,16 @@ int main() {
                     << "\"job_id\":\"" << jobId << "\","
                     << "\"type\":\"MAP\","
                     << "\"kv_lines\":\"";
-            // escapar comillas y backslashes
+            // escapar comillas, backslashes, NEWLINE y TAB
             for (char c: kv) {
-                if (c == '\\' || c == '\"') payload << '\\' << c;
-                else if (c == '\n') payload << "\\n";
-                else payload << c;
+                if (c == '\\' || c == '\"')
+                    payload << '\\' << c;
+                else if (c == '\n')
+                    payload << "\\n";
+                else if (c == '\t')
+                    payload << "\\t";
+                else
+                    payload << c;
             }
             payload << "\"}";
             http_post_json(master + "/api/tasks/complete", payload.str());
@@ -121,16 +168,17 @@ int main() {
             // Guardar reduce input y script
             std::string rPy = http_get(master + reduceUrl);
             save_file("reduce.py", rPy);
-            // revertir \n escapados
-            for (size_t pos = 0; (pos = kvLines.find("\\n", pos)) != std::string::npos;) {
-                kvLines.replace(pos, 2, "\n");
-                pos++;
-            }
             save_file("reduce_in.txt", kvLines);
             // Ejecutar reduce
             run("python3 reduce.py reduce_in.txt > reduce.out");
+            // ... después de run("cat reduce.out");
             std::string out = run("cat reduce.out");
-            // Reportar
+
+            // Aviso si el reducer no produjo nada
+            if (out.empty()) {
+                std::cerr << "[WARN] Reducer produced 0 lines for task " << taskId << std::endl;
+            }
+
             std::ostringstream payload;
             payload << "{"
                     << "\"worker_id\":\"" << workerId << "\","
@@ -139,9 +187,14 @@ int main() {
                     << "\"type\":\"REDUCE\","
                     << "\"output\":\"";
             for (char c: out) {
-                if (c == '\\' || c == '\"') payload << '\\' << c;
-                else if (c == '\n') payload << "\\n";
-                else payload << c;
+                if (c == '\\' || c == '\"')
+                    payload << '\\' << c;
+                else if (c == '\n')
+                    payload << "\\n";
+                else if (c == '\t')
+                    payload << "\\t";
+                else
+                    payload << c;
             }
             payload << "\"}";
             http_post_json(master + "/api/tasks/complete", payload.str());
