@@ -1,17 +1,23 @@
+package src;
+
+import java.net.InetSocketAddress;
+import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
+
 import com.sun.net.httpserver.HttpServer;
+
 import api.JobsApi;
 import api.TasksApi;
 import api.WorkersApi;
 import core.Scheduler;
+import grpc.gRPCUtils;
 import http.HttpUtils;
 import model.JobCtx;
 import model.Task;
 import model.Worker;
 
-import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
-import java.util.Map;
-import java.util.concurrent.*;
 
 public class Main {
 
@@ -44,5 +50,7 @@ public class Main {
 
         server.start();
         System.out.println("Road-Poneglyph Master listening on :8080");
+        gRPCUtils.main(args);
     }
+
 }
