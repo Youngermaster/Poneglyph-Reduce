@@ -1,0 +1,305 @@
+syntax = "proto3";
+
+package poneglyph;
+
+option java_package = "com.poneglyph.grpc";
+option java_outer_classname = "PoneglyphProto";
+
+// Worker Management Service
+service WorkerManagementService {
+  // Worker registration and health checks
+  rpc RegisterWorker(RegisterWorkerRequest) returns (RegisterWorkerResponse);
+  rpc SendHeartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc GetWorkerStatus(WorkerStatusRequest) returns (WorkerStatusResponse);
+  rpc UnregisterWorker(UnregisterWorkerRequest) returns (UnregisterWorkerResponse);
+}
+
+// Task Distribution Service
+service TaskDistributionService {
+  // Task assignment and completion
+  rpc RequestTask(TaskRequest) returns (TaskResponse);
+  rpc CompleteTask(TaskCompletionRequest) returns (TaskCompletionResponse);
+  rpc ReportTaskProgress(TaskProgressRequest) returns (TaskProgressResponse);
+}
+
+// Job Management Service
+service JobManagementService {
+  // Job lifecycle management
+  rpc SubmitJob(SubmitJobRequest) returns (SubmitJobResponse);
+  rpc GetJobStatus(JobStatusRequest) returns (JobStatusResponse);
+  rpc GetJobResult(JobResultRequest) returns (JobResultResponse);
+  rpc CancelJob(CancelJobRequest) returns (CancelJobResponse);
+}
+
+// Resource Management Service
+service ResourceManagementService {
+  // Resource monitoring and allocation
+  rpc GetClusterResources(ClusterResourcesRequest) returns (ClusterResourcesResponse);
+  rpc AllocateResources(ResourceAllocationRequest) returns (ResourceAllocationResponse);
+  rpc ReleaseResources(ResourceReleaseRequest) returns (ResourceReleaseResponse);
+}
+
+// Messages for Worker Management
+message RegisterWorkerRequest {
+  string worker_name = 1;
+  int32 capacity = 2;
+  repeated string capabilities = 3;
+  WorkerResourceInfo resources = 4;
+  string location = 5; // AWS region/zone
+}
+
+message RegisterWorkerResponse {
+  string worker_id = 1;
+  int32 poll_interval_ms = 2;
+  bool success = 3;
+  string message = 4;
+}
+
+message HeartbeatRequest {
+  string worker_id = 1;
+  WorkerResourceInfo current_resources = 2;
+  repeated string running_tasks = 3;
+  WorkerStatus status = 4;
+}
+
+message HeartbeatResponse {
+  bool acknowledged = 1;
+  repeated string commands = 2; // Commands from master
+  int32 next_heartbeat_interval = 3;
+}
+
+message WorkerStatusRequest {
+  string worker_id = 1;
+}
+
+message WorkerStatusResponse {
+  WorkerInfo worker = 1;
+  bool is_healthy = 2;
+  int64 last_heartbeat = 3;
+}
+
+message UnregisterWorkerRequest {
+  string worker_id = 1;
+  string reason = 2;
+}
+
+message UnregisterWorkerResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Messages for Task Distribution
+message TaskRequest {
+  string worker_id = 1;
+  repeated string preferred_task_types = 2;
+}
+
+message TaskResponse {
+  bool has_task = 1;
+  Task task = 2;
+  string message = 3;
+}
+
+message TaskCompletionRequest {
+  string worker_id = 1;
+  string task_id = 2;
+  string job_id = 3;
+  TaskType task_type = 4;
+  TaskResult result = 5;
+  int64 execution_time_ms = 6;
+}
+
+message TaskCompletionResponse {
+  bool acknowledged = 1;
+  string message = 2;
+}
+
+message TaskProgressRequest {
+  string worker_id = 1;
+  string task_id = 2;
+  float progress_percentage = 3;
+  string status_message = 4;
+}
+
+message TaskProgressResponse {
+  bool acknowledged = 1;
+}
+
+// Messages for Job Management
+message SubmitJobRequest {
+  string job_id = 1;
+  string input_text = 2;
+  int32 split_size = 3;
+  int32 reducers = 4;
+  string format = 5;
+  bytes map_script = 6;
+  bytes reduce_script = 7;
+  JobPriority priority = 8;
+  repeated string required_capabilities = 9;
+}
+
+message SubmitJobResponse {
+  bool success = 1;
+  string job_id = 2;
+  int32 estimated_map_tasks = 3;
+  string message = 4;
+}
+
+message JobStatusRequest {
+  string job_id = 1;
+}
+
+message JobStatusResponse {
+  string job_id = 1;
+  JobState state = 2;
+  int32 maps_total = 3;
+  int32 maps_completed = 4;
+  int32 reduces_total = 5;
+  int32 reduces_completed = 6;
+  float progress_percentage = 7;
+  int64 estimated_completion_time = 8;
+}
+
+message JobResultRequest {
+  string job_id = 1;
+}
+
+message JobResultResponse {
+  bool ready = 1;
+  string result_data = 2;
+  string result_url = 3; // S3 URL if stored in bucket
+  string message = 4;
+}
+
+message CancelJobRequest {
+  string job_id = 1;
+  string reason = 2;
+}
+
+message CancelJobResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Messages for Resource Management
+message ClusterResourcesRequest {
+  bool include_worker_details = 1;
+}
+
+message ClusterResourcesResponse {
+  ClusterResourceInfo total_resources = 1;
+  ClusterResourceInfo available_resources = 2;
+  repeated WorkerInfo workers = 3;
+}
+
+message ResourceAllocationRequest {
+  string job_id = 1;
+  ResourceRequirement requirements = 2;
+}
+
+message ResourceAllocationResponse {
+  bool allocated = 1;
+  repeated string allocated_workers = 2;
+  string message = 3;
+}
+
+message ResourceReleaseRequest {
+  string job_id = 1;
+  repeated string worker_ids = 2;
+}
+
+message ResourceReleaseResponse {
+  bool success = 1;
+}
+
+// Core Data Types
+message WorkerInfo {
+  string worker_id = 1;
+  string worker_name = 2;
+  int32 capacity = 3;
+  repeated string capabilities = 4;
+  WorkerResourceInfo resources = 5;
+  WorkerStatus status = 6;
+  int64 last_heartbeat = 7;
+  string location = 8;
+  int32 current_tasks = 9;
+}
+
+message WorkerResourceInfo {
+  int32 cpu_cores = 1;
+  int64 memory_mb = 2;
+  int64 disk_gb = 3;
+  float cpu_usage_percent = 4;
+  float memory_usage_percent = 5;
+  float disk_usage_percent = 6;
+}
+
+message ClusterResourceInfo {
+  int32 total_workers = 1;
+  int32 active_workers = 2;
+  int32 total_cpu_cores = 3;
+  int64 total_memory_mb = 4;
+  int64 total_disk_gb = 5;
+  int32 available_cpu_cores = 6;
+  int64 available_memory_mb = 7;
+  int64 available_disk_gb = 8;
+}
+
+message Task {
+  string task_id = 1;
+  string job_id = 2;
+  TaskType type = 3;
+  bytes payload = 4; // JSON-encoded task data
+  repeated string required_capabilities = 5;
+  ResourceRequirement resource_requirements = 6;
+  int32 retry_count = 7;
+  int64 timeout_ms = 8;
+}
+
+message TaskResult {
+  bool success = 1;
+  bytes result_data = 2; // Output data
+  string error_message = 3;
+  map<string, string> metrics = 4; // Performance metrics
+}
+
+message ResourceRequirement {
+  int32 cpu_cores = 1;
+  int64 memory_mb = 2;
+  int64 disk_gb = 3;
+  int32 estimated_duration_seconds = 4;
+}
+
+// Enums
+enum WorkerStatus {
+  WORKER_UNKNOWN = 0;
+  WORKER_IDLE = 1;
+  WORKER_BUSY = 2;
+  WORKER_OFFLINE = 3;
+  WORKER_ERROR = 4;
+  WORKER_MAINTENANCE = 5;
+}
+
+enum TaskType {
+  TASK_UNKNOWN = 0;
+  TASK_MAP = 1;
+  TASK_REDUCE = 2;
+  TASK_SHUFFLE = 3;
+  TASK_CLEANUP = 4;
+}
+
+enum JobState {
+  JOB_UNKNOWN = 0;
+  JOB_PENDING = 1;
+  JOB_RUNNING = 2;
+  JOB_SUCCEEDED = 3;
+  JOB_FAILED = 4;
+  JOB_CANCELLED = 5;
+}
+
+enum JobPriority {
+  PRIORITY_LOW = 0;
+  PRIORITY_NORMAL = 1;
+  PRIORITY_HIGH = 2;
+  PRIORITY_CRITICAL = 3;
+}

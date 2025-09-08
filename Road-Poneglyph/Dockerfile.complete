@@ -1,0 +1,52 @@
+# Multi-stage build for Java Master
+FROM gradle:7.6-jdk17 AS builder
+
+WORKDIR /app
+COPY . .
+
+# Build the application
+RUN gradle build --no-daemon
+
+FROM openjdk:17-jdk-slim
+
+# Install required tools
+RUN apt-get update && apt-get install -y \
+    netcat-openbsd \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy the built JAR from builder stage
+COPY --from=builder /app/build/libs/*.jar app.jar
+
+# Copy the source files for direct execution
+COPY src/ ./src/
+
+# Set environment variables
+ENV GRPC_HOST=middleware
+ENV GRPC_PORT=50051
+ENV JAVA_OPTS="-Xmx1g -Xms512m"
+
+# Create entrypoint script
+RUN echo '#!/bin/bash\n\
+echo "Starting Poneglyph Java Master..."\n\
+echo "Environment:"\n\
+echo "  GRPC_HOST: $GRPC_HOST"\n\
+echo "  GRPC_PORT: $GRPC_PORT"\n\
+echo "  JAVA_OPTS: $JAVA_OPTS"\n\
+echo ""\n\
+echo "Waiting for gRPC middleware..."\n\
+while ! nc -z $GRPC_HOST $GRPC_PORT; do\n\
+  echo "  Waiting for $GRPC_HOST:$GRPC_PORT..."\n\
+  sleep 2\n\
+done\n\
+echo "  ✓ gRPC middleware is ready!"\n\
+echo ""\n\
+echo "Starting Java Master..."\n\
+cd /app/src && javac *.java && java $JAVA_OPTS PoneglyphGrpcDemo\n\
+' > /app/start_master.sh && chmod +x /app/start_master.sh
+
+EXPOSE 8080
+
+CMD ["/app/start_master.sh"]

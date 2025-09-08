@@ -282,7 +282,10 @@ public class Main {
 
             if ("MAP".equals(type)) {
                 String kv = j.get("kv_lines").getAsString(); // "k\tv\n..."
+                System.out.println("Processing MAP task " + taskId + " with " + kv.length() + " characters");
+                
                 // Shuffle: agrupar por partición
+                int lineCount = 0;
                 for (String line : kv.split("\n")) {
                     if (line.isBlank()) continue;
                     String[] kvp = line.split("\t");
@@ -291,31 +294,43 @@ public class Main {
                     String v = kvp[1];
                     int p = partitionOf(k, ctx.spec.reducers);
                     ctx.partitionKV.get(p).add(k + "\t" + v);
+                    lineCount++;
                 }
+                System.out.println("MAP task " + taskId + " processed " + lineCount + " key-value pairs");
                 ctx.completedMaps++;
                 // Cuando terminan todos los MAP: crear REDUCE tasks
                 if (ctx.completedMaps == ctx.mapTasks.size()) {
-                    int rIx = 0;
                     for (Map.Entry<Integer, List<String>> e : ctx.partitionKV.entrySet()) {
-                        Task rt = new Task();
-                        rt.type = TaskType.REDUCE;
-                        rt.taskId = "reduce-" + rIx;
-                        rt.jobId = jobId;
-                        rt.partitionIndex = e.getKey();
-                        rt.kvLinesForReduce = e.getValue();
-                        ctx.reduceTasks.add(rt);
-                        pendingTasks.offer(rt);
-                        rIx++;
+                        int partitionIndex = e.getKey();
+                        List<String> kvData = e.getValue();
+                        
+                        // Solo crear tarea REDUCE si hay datos para procesar
+                        if (!kvData.isEmpty()) {
+                            Task rt = new Task();
+                            rt.type = TaskType.REDUCE;
+                            rt.taskId = "reduce-" + partitionIndex;
+                            rt.jobId = jobId;
+                            rt.partitionIndex = partitionIndex;
+                            rt.kvLinesForReduce = kvData;
+                            ctx.reduceTasks.add(rt);
+                            pendingTasks.offer(rt);
+                            System.out.println("Created REDUCE task " + rt.taskId + " with " + kvData.size() + " lines");
+                        } else {
+                            System.out.println("Skipping empty partition " + partitionIndex);
+                        }
                     }
                 }
                 respondJson(ex, 200, Map.of("ack", true));
             } else {
                 String out = j.get("output").getAsString(); // "k\tsum\n..."
+                System.out.println("REDUCE task " + taskId + " completed with output length: " + out.length());
+                System.out.println("Output content: '" + out + "'");
                 ctx.completedReduces++;
                 // Concatenar en orden de partición
                 ctx.finalOutput += out + (out.endsWith("\n") ? "" : "\n");
                 if (ctx.completedReduces == ctx.spec.reducers) {
                     ctx.state = JobState.SUCCEEDED;
+                    System.out.println("Job " + jobId + " completed. Final output length: " + ctx.finalOutput.length());
                 }
                 respondJson(ex, 200, Map.of("ack", true));
             }

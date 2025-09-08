@@ -1,8 +1,34 @@
-plugins { id 'application' }
+plugins { 
+    id 'application'
+    id 'com.google.protobuf' version '0.9.4'
+}
 repositories { mavenCentral() }
 
 dependencies {
     implementation 'com.google.code.gson:gson:2.11.0'
+    
+    // gRPC dependencies
+    implementation 'io.grpc:grpc-netty-shaded:1.58.0'
+    implementation 'io.grpc:grpc-protobuf:1.58.0'
+    implementation 'io.grpc:grpc-stub:1.58.0'
+    implementation 'com.google.protobuf:protobuf-java:3.24.4'
+    compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:3.24.4"
+    }
+    plugins {
+        grpc {
+            artifact = 'io.grpc:protoc-gen-grpc-java:1.58.0'
+        }
+    }
+    generateProtoTasks {
+        all()*.plugins {
+            grpc {}
+        }
+    }
 }
 
 application {

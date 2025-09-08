@@ -1,231 +1,189 @@
-# Poneglyph Reduce
+# Poneglyph-Reduce: Distributed MapReduce System with gRPC Middleware
 
-**Poneglyph Reduce** is a minimal-yet-real MapReduce system inspired by Hadoop/Spark and designed to satisfy the **GridMR** assignment requirements: a **Master-Workers** architecture running over the network (HTTP), job submission from a client, input splitting, scheduling, shuffle, reduce, and result consolidation. &#x20;
+A high-performance distributed MapReduce system implementing the framework from the classic Google MapReduce paper, enhanced with modern gRPC middleware for efficient communication and job orchestration.
 
-> ⚓ **One Piece-themed naming**
->
-> * **Road-Poneglyph** (Master, Java): like the four “Road Poneglyphs” that lead to Laugh Tale—the coordinator that knows how to reach the final answer.
-> * **Poneglyph** (Workers, C++): “regular” Poneglyphs that carry fragments of information—our agents that process shards and produce intermediate knowledge.
-> * **Clover** (Client, Python): inspired by Professor Clover from Ohara—the one who can *read* and *submit* tasks, interacting with Poneglyphs to reveal the final story.
-
-## 1) What is this project?
-
-This repository implements a distributed data processing service—**Grid-style MapReduce**—over a set of heterogeneous nodes, with **HTTP/REST** communication, containerized nodes, and a simple Python client for job submission and validation. It follows the GridMR brief: design the system, define protocols, plan tasks (split/schedule/shuffle/reduce), and consolidate results for the client.  &#x20;
-
-**Supported “user projects” (by writing custom map/reduce):** distributed statistics, inverted index, PageRank, simple ML (regression/clustering), Monte Carlo, cellular automata, etc.&#x20;
-
-## 2) Architecture (high level)
-
-* **Master (Road-Poneglyph / Java 17+)**
-
-  * Accepts jobs from the client (Python), stores scripts and config.
-  * Splits the input into **shards**, enqueues **MAP** tasks to workers, performs **shuffle** (group by key → partition), emits **REDUCE** tasks, and **consolidates** the outputs. &#x20;
-* **Workers (Poneglyph / C++20)**
-
-  * Register and **poll** the master for tasks.
-  * Execute **map** on assigned shard (with a lightweight combiner), then consume partitions for **reduce** and return the reduced results.
-* **Client (Clover / Python)**
-
-  * Submits jobs containing **map()/reduce()** code, **split size**, **#reducers**, and **input location/content**; tracks status and fetches results.&#x20;
-
-**Transport:** HTTP/REST for v1 (permitted GridMR suggestion). gRPC/WebSockets/MOM can be added later.&#x20;
-
-**Deployment:** each node runs natively or in **Docker containers**; containers can live on different machines and expose APIs over the Internet (as per spec).&#x20;
-
-## 3) How it works (MapReduce flow)
-
-1. **Submit**: Clover sends a **Job Package** → `{ job_id, input_text|input_uri, split_size, reducers, format, map_script_b64, reduce_script_b64 }`.&#x20;
-2. **Split & Schedule**: Road-Poneglyph splits the input and schedules **MAP** tasks to available workers (capacity, availability, load balancing are in-scope in the spec; v1 uses FIFO/availability).&#x20;
-3. **Map**: Workers run `map.py` on their shard and return lines like `key\tvalue`.
-4. **Shuffle**: Master partitions by `hash(key) % reducers`, grouping intermediate KV per reducer index.
-5. **Reduce**: Master issues **REDUCE** tasks; workers run `reduce.py` over the grouped KVs, returning aggregated results.
-6. **Consolidate**: Master concatenates reducer outputs (or persists them) and exposes the final result to the client.&#x20;
-
-> **Data access modes (spec guidance):** GridMR allows either **transfer-based** modes (send/receive files) or via an API to a distributed store (**GridFS/S3-like**). This repo starts with transfer-based HTTP + local files, but the code is structured to add a storage API later (e.g., MinIO). &#x20;
-
-## 4) Repository layout
+## 🏗️ Architecture
 
 ```
-Poneglyph-Reduce/
-├─ Road-Poneglyph/     # Master (Java 17+, HTTP/REST)
-│  ├─ src/...          # Master HTTP server, task planner, shuffle/consolidation
-│  ├─ build.gradle
-│  ├─ settings.gradle
-│  └─ Dockerfile
-├─ Poneglyph/          # Worker (C++20)
-│  ├─ main.cpp         # Polls master, executes map/reduce via embedded Python calls
-│  ├─ CMakeLists.txt
-│  └─ Dockerfile
-├─ client/             # Clover (Python)
-│  ├─ submit_job.py    # Submits job, polls status, fetches result
-│  ├─ map.py           # Example mapper (WordCount)
-│  ├─ reduce.py        # Example reducer (WordCount)
-│  └─ Dockerfile
-└─ docker-compose.yml  # One master, N workers, client container
+┌─────────────────┐    gRPC     ┌──────────────────┐    RabbitMQ    ┌─────────────────┐
+│   Java Master   │◄────────────│  gRPC Middleware │◄───────────────│  C++ Workers    │
+│   (Scheduler)   │             │   (Python)       │               │  (Map/Reduce)   │
+└─────────────────┘             └──────────────────┘               └─────────────────┘
+                                          │
+                                     Redis │
+                                          ▼
+                                ┌──────────────────┐
+                                │  Distributed     │
+                                │  State Store     │
+                                └──────────────────┘
 ```
 
-## 5) Quick start (with Docker)
+### Core Components
+
+- **Java Master** (`Road-Poneglyph/`): Job scheduler and coordinator with HTTP REST API
+- **C++ Workers** (`Poneglyph/`): High-performance MAP/REDUCE task processors  
+- **gRPC Middleware** (`PoneglyphMiddleware/`): Modern communication layer with RabbitMQ + Redis
+- **Docker Orchestration**: Containerized deployment with docker-compose
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Docker & Docker Compose
+- Python 3.11+ (for local development)
+- Java 17+ (for master development)
+- CMake & GCC (for worker development)
+
+### Basic System (HTTP)
+```bash
+# Start basic MapReduce system
+docker-compose -f docker-compose.basic.yml up -d
+
+# Test with sample job
+curl -X POST http://localhost:8080/api/jobs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "job_id": "test_job",
+    "input_data": "one fish two fish red fish blue fish",
+    "map_script": "#!/usr/bin/env python3\nimport sys\nfor line in sys.stdin:\n    for word in line.split():\n        print(f\"{word}\\t1\")",
+    "reduce_script": "#!/usr/bin/env python3\nimport sys\ncurrent_word = None\ncurrent_count = 0\nfor line in sys.stdin:\n    word, count = line.strip().split(\"\\t\")\n    if current_word == word:\n        current_count += int(count)\n    else:\n        if current_word:\n            print(f\"{current_word}\\t{current_count}\")\n        current_word = word\n        current_count = int(count)\nif current_word:\n    print(f\"{current_word}\\t{current_count}\")"
+  }'
+
+# Check job status
+curl http://localhost:8080/api/jobs/status?job_id=test_job
+```
+
+### gRPC System (Advanced)
+```bash
+# Start gRPC infrastructure  
+docker-compose -f docker-compose.grpc.yml up rabbitmq redis -d
+
+# Run gRPC middleware locally
+cd PoneglyphMiddleware
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python grpc_middleware.py
+
+# Test gRPC client
+python test_grpc_client.py
+```
+
+## 📚 System Details
+
+### HTTP API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/health` | GET | Health check |
+| `/api/jobs` | POST | Submit MapReduce job |
+| `/api/jobs/status` | GET | Get job status |
+
+### gRPC Services
+
+| Service | Methods | Description |
+|---------|---------|-------------|
+| `JobManagementService` | `SubmitJob`, `GetJobStatus` | Job lifecycle management |
+| `WorkerManagementService` | `RegisterWorker`, `SendHeartbeat` | Worker coordination |
+| `TaskDistributionService` | `RequestTask`, `CompleteTask` | Task assignment and completion |
+
+### Job Execution Flow
+
+1. **Job Submission**: Client submits job with MAP/REDUCE scripts
+2. **Task Creation**: Master splits input data into MAP tasks
+3. **Worker Registration**: C++ workers register with middleware  
+4. **Task Distribution**: Middleware assigns tasks via RabbitMQ
+5. **MAP Phase**: Workers process input chunks and emit key-value pairs
+6. **REDUCE Phase**: Workers aggregate results by key
+7. **Result Collection**: Final results stored in Redis/returned to client
+
+## 🔧 Development
+
+### Adding New Features
+
+1. **gRPC Protocol Changes**: Modify `poneglyph.proto`, regenerate with:
+   ```bash
+   python -m grpc_tools.protoc --proto_path=. --python_out=. --grpc_python_out=. poneglyph.proto
+   ```
+
+2. **Master Extensions**: Enhance Java REST API in `Road-Poneglyph/src/Main.java`
+
+3. **Worker Optimization**: Improve C++ performance in `Poneglyph/main.cpp`
+
+4. **Middleware Logic**: Extend Python gRPC services in `grpc_middleware.py`
+
+### Testing
 
 ```bash
-# From the repo root:
-docker compose up --build --scale worker=3 -d
+# Basic system test
+docker-compose -f docker-compose.basic.yml up -d
+# Run your test jobs...
 
-# Follow master logs:
-docker logs -f road-poneglyph
-
-# Re-run the client (submits WordCount and prints the result):
-docker compose run --rm client
+# gRPC system test  
+cd PoneglyphMiddleware
+python test_grpc_client.py
 ```
 
-> Default ports: Master exposes `:8080`.
+## 📊 Performance Features
 
-## 6) API (v1 sketch)
+- **Horizontal Scaling**: Add more workers by scaling Docker containers
+- **Fault Tolerance**: Worker failure detection and task reassignment
+- **Load Balancing**: Intelligent task distribution via middleware
+- **Efficient Communication**: gRPC binary protocol vs HTTP JSON
+- **Persistent Storage**: Redis for job state and RabbitMQ for message queuing
 
-* **POST** `/api/jobs` → submit a job package (Python scripts in Base64, split/reducers/input).
-* **GET**  `/api/jobs/status?job_id=...` → job state + counters.
-* **GET**  `/api/jobs/result?job_id=...` → final output (when `SUCCEEDED`).
-* **POST** `/api/workers/register` → workers announce themselves.
-* **GET**  `/api/tasks/next?workerId=...` → workers poll for MAP/REDUCE tasks.
-* **POST** `/api/tasks/complete` → workers report MAP/REDUCE completion.
+## 🐳 Docker Configuration
 
-> The spec explicitly requires defining **Client ↔ Master** and **Master ↔ Workers** communications; this API covers the required flows.&#x20;
-
-### 6.1) Inspecting jobs & results
-
-After the stack is up and the client has submitted the WordCount job:
-
-```bash
-# List jobs (IDs)
-curl -s http://localhost:8080/api/jobs | jq .
-
-# Check status (state, completed tasks)
-curl -s "http://localhost:8080/api/jobs/status?job_id=wordcount-001" | jq .
-
-# Fetch final result (once state == SUCCEEDED)
-curl -s "http://localhost:8080/api/jobs/result?job_id=wordcount-001"
+### Basic System
+```yaml
+# docker-compose.basic.yml
+services:
+  master:    # Java scheduler on port 8080
+  worker-1:  # C++ MAP/REDUCE processor
+  worker-2:  # C++ MAP/REDUCE processor  
+  minio:     # S3-compatible storage
 ```
 
-**Expected (example)** for the default WordCount input repeated 10 times:
-
-```
-blue    10
-fish    40
-one     10
-red     10
-two     10
-```
-
-> You can also use Thunder Client / Postman:
->
-> * **GET** `http://localhost:8080/api/jobs`
-> * **GET** `http://localhost:8080/api/jobs/status?job_id=wordcount-001`
-> * **GET** `http://localhost:8080/api/jobs/result?job_id=wordcount-001`
-
-To re-run the example job:
-
-```bash
-docker compose run --rm client
-# then fetch result again:
-curl -s "http://localhost:8080/api/jobs/result?job_id=wordcount-001"
+### gRPC System
+```yaml
+# docker-compose.grpc.yml  
+services:
+  grpc-middleware: # Python gRPC server on port 50051
+  rabbitmq:        # Message queue on port 5672
+  redis:           # State store on port 6379
 ```
 
-> Note: the bundled client uses a fixed `job_id=wordcount-001`. Re-running the client overwrites that job’s scripts and input. For multiple concurrent jobs, make the client read `JOB_ID` from an env var or argument.
+## 🎯 Use Cases
 
-### 6.2) Optional: debug endpoint
+- **Data Processing**: Large-scale text analysis, log processing
+- **Machine Learning**: Distributed feature extraction, model training
+- **Analytics**: Batch processing of business metrics
+- **Research**: Academic distributed systems experiments
 
-If you enabled the optional debug endpoint in the master (as suggested in the docs), you can inspect per-partition sizes:
+## 📝 Implementation Notes
 
-```bash
-# Debug: partition sizes for the job
-curl -s "http://localhost:8080/api/jobs/debug?job_id=wordcount-001" | jq .
-```
+- **Language Choice**: Java for reliability, C++ for performance, Python for middleware agility
+- **Communication**: HTTP for simplicity, gRPC for high-performance scenarios
+- **Storage**: MinIO (S3-compatible) for job data, Redis for fast state access
+- **Messaging**: RabbitMQ for reliable task distribution and result collection
 
-**Example output**:
+## 🤝 Contributing
 
-```json
-{
-  "state": "SUCCEEDED",
-  "partition_sizes": [123, 117]
-}
-```
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open Pull Request
 
-> If you see just `["wordcount-001"]`, you’re likely calling **`/api/jobs`** (job list), not `/api/jobs/debug`.
+## 📄 License
 
-### 6.3) Useful logs
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-```bash
-# Master logs (task creation, shuffle, reducers finishing)
-docker logs -f road-poneglyph
+## 🔗 References
 
-# Worker logs (MAP/REDUCE execution; warnings if mapper/reducer produced 0 lines)
-docker compose logs -f worker
-```
+- [MapReduce: Simplified Data Processing on Large Clusters](https://research.google.com/archive/mapreduce.html)
+- [gRPC Documentation](https://grpc.io/docs/)
+- [Docker Compose Reference](https://docs.docker.com/compose/)
 
-## 7) Example job (WordCount)
+---
 
-**Mapper (`map.py`)**: tokenize to lowercase words and emit `word\t1`.
-**Reducer (`reduce.py`)**: sum counts per word and emit `word\tcount`.
-
-The **client** encodes both scripts as Base64, sets `split_size` and `reducers`, and submits the job. This aligns with the GridMR “program package” requirements (map/reduce functions, partition params, input location, optional globals/deps).&#x20;
-
-## 8) Why this matches the GridMR brief
-
-* **Master-Workers** architecture, HTTP across Internet-exposed nodes, containerized services. &#x20;
-* **Task planning**: split input, assign Map, collect intermediates, run Reduce, consolidate results. &#x20;
-* **Program package** includes job id, `map()/reduce()`, partition parameters, and input location/content.&#x20;
-* **Data modes** considered (transfer vs. API to distributed storage), with a simple transfer mode in v1 and a clear path to GridFS/S3 in v2. &#x20;
-* **Tech choice** follows the spec suggestions (REST now; gRPC/Kafka/etc. as optional enhancements).&#x20;
-
-## 9) Roadmap (next iterations)
-
-* **Fault tolerance**: task timeouts, retries, worker heartbeats, re-queue.
-* **Storage**: GridFS/S3 (e.g., MinIO) for intermediate and final outputs.
-* **Scheduling**: capacity-aware & load-balanced placement (as the brief encourages).&#x20;
-* **gRPC** for efficient binary exchange; **Kafka/RabbitMQ** for async shuffles or eventing.&#x20;
-* **Security**: tokens per worker/job, auth on control plane.
-* **More examples**: inverted index, PageRank, Monte Carlo.
-
-> The assignment also asks for: a **technical report**, a **well-documented repo**, and a **demo video**—items this project structure is designed to support. &#x20;
-
-## 10) Requirements
-
-* **Master**: Java **17+** (Docker image uses JRE 17; local JDK 24 works fine).
-* **Workers**: C++20 toolchain, `curl`, `python3` (all baked in the Docker image).
-* **Client**: Python 3.10+.
-
-> You can also run everything **fully containerized** with `docker compose` and avoid installing host toolchains.
-
-## 11) A note on the lore 🌊
-
-* The **Road-Poneglyph** *leads to the truth*: it knows where shards go and how to combine them—the central planner and consolidator.
-* Each **Poneglyph** worker *holds a fragment* and processes it, forwarding the decipherable pieces.
-* **Clover** is the scholar who can read Poneglyphs—our client orchestrating the story (job) and interpreting the final record.
-
-## 12) Usage
-
-```bash
-# From the repo root:
-docker compose up --build --scale worker=3 -d
-
-# Follow master logs:
-docker logs -f road-poneglyph
-
-# Re-run the client (submits WordCount and prints result):
-docker compose run --rm client
-```
-
-## 13) Reset / cleanup
-
-```bash
-# Stop and remove containers
-docker compose down
-
-# Full reset (containers + volumes/networks)
-docker compose down -v
-```
-
-**References**
-
-- Hadoop tutorial.
-- Zaharia et al., "Resilient Distributed Datasets: A Fault-Tolerant Abstraction for In-Memory Cluster Computing", NSDI 2012.
-- etc.
+**Built with ❤️ for distributed systems education and high-performance computing.**

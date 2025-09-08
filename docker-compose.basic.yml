@@ -1,0 +1,64 @@
+services:
+  # Master (Job Scheduler) - Basic mode
+  master:
+    build: ./Road-Poneglyph
+    container_name: road-poneglyph-basic
+    ports:
+      - "8080:8080"
+    environment:
+      # NO MIDDLEWARE - Direct mode
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: poneglyph
+      MINIO_SECRET_KEY: poneglyph123
+    volumes:
+      - master_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Workers - Basic mode
+  worker:
+    build: ./Poneglyph
+    depends_on:
+      master:
+        condition: service_healthy
+    environment:
+      PONEGLYPH_MASTER_URL: http://road-poneglyph-basic:8080
+      WORKER_LOCATION: ${AWS_REGION:-us-east-1}
+      WORKER_CAPACITY: 2
+    volumes:
+      - worker_data:/app/data
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+
+  # S3-compatible storage (MinIO)
+  minio:
+    image: minio/minio:latest
+    container_name: poneglyph-minio-basic
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: poneglyph
+      MINIO_ROOT_PASSWORD: poneglyph123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+volumes:
+  master_data:
+  worker_data:
+  minio_data:
+
+networks:
+  default:
+    name: poneglyph-basic-network

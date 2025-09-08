@@ -1,0 +1,56 @@
+services:
+  # Infrastructure Services
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: poneglyph-rabbitmq-grpc
+    environment:
+      RABBITMQ_DEFAULT_USER: poneglyph
+      RABBITMQ_DEFAULT_PASS: poneglyph123
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - grpc-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: poneglyph-redis-grpc
+    ports:
+      - "6379:6379"
+    networks:
+      - grpc-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # gRPC Middleware
+  grpc-middleware:
+    build:
+      context: ./PoneglyphMiddleware
+      dockerfile: Dockerfile.grpc
+    container_name: poneglyph-grpc-middleware
+    ports:
+      - "50051:50051"
+    environment:
+      RABBITMQ_URL: amqp://poneglyph:poneglyph123@rabbitmq:5672/
+      REDIS_URL: redis://redis:6379
+      GRPC_PORT: 50051
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - grpc-network
+    restart: unless-stopped
+
+networks:
+  grpc-network:
+    driver: bridge

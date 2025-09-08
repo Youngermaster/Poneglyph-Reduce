@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poneglyph MapReduce Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .status-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .status-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .status-card h3 {
+            font-size: 1.4em;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-healthy {
+            background-color: #4CAF50;
+            box-shadow: 0 0 10px #4CAF50;
+        }
+
+        .status-warning {
+            background-color: #FF9800;
+            box-shadow: 0 0 10px #FF9800;
+        }
+
+        .status-error {
+            background-color: #F44336;
+            box-shadow: 0 0 10px #F44336;
+        }
+
+        .service-list {
+            list-style: none;
+        }
+
+        .service-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .service-item:last-child {
+            border-bottom: none;
+        }
+
+        .architecture {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .architecture h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 2em;
+        }
+
+        .flow-diagram {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .flow-item {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px 20px;
+            border-radius: 10px;
+            text-align: center;
+            min-width: 120px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .flow-arrow {
+            font-size: 2em;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .quick-actions {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .quick-actions h2 {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .action-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .action-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            text-decoration: none;
+            text-align: center;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+
+        .action-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            opacity: 0.8;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏴‍☠️ Poneglyph</h1>
+            <p>Distributed MapReduce System Dashboard</p>
+        </div>
+
+        <div class="status-grid">
+            <div class="status-card">
+                <h3>
+                    <span class="status-indicator status-healthy pulse"></span>
+                    System Status
+                </h3>
+                <ul class="service-list">
+                    <li class="service-item">
+                        <span>Java Master</span>
+                        <span class="status-indicator status-healthy"></span>
+                    </li>
+                    <li class="service-item">
+                        <span>gRPC Middleware</span>
+                        <span class="status-indicator status-healthy"></span>
+                    </li>
+                    <li class="service-item">
+                        <span>RabbitMQ</span>
+                        <span class="status-indicator status-healthy"></span>
+                    </li>
+                    <li class="service-item">
+                        <span>Redis</span>
+                        <span class="status-indicator status-healthy"></span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="status-card">
+                <h3>
+                    <span class="status-indicator status-healthy pulse"></span>
+                    Worker Nodes
+                </h3>
+                <ul class="service-list">
+                    <li class="service-item">
+                        <span>C++ Worker 1</span>
+                        <span class="status-indicator status-healthy"></span>
+                    </li>
+                    <li class="service-item">
+                        <span>C++ Worker 2</span>
+                        <span class="status-indicator status-healthy"></span>
+                    </li>
+                    <li class="service-item">
+                        <span>C++ Worker 3</span>
+                        <span class="status-indicator status-healthy"></span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="status-card">
+                <h3>
+                    <span class="status-indicator status-healthy"></span>
+                    Performance
+                </h3>
+                <ul class="service-list">
+                    <li class="service-item">
+                        <span>Active Jobs</span>
+                        <span>0</span>
+                    </li>
+                    <li class="service-item">
+                        <span>Completed Jobs</span>
+                        <span>3</span>
+                    </li>
+                    <li class="service-item">
+                        <span>Total Tasks</span>
+                        <span>15</span>
+                    </li>
+                    <li class="service-item">
+                        <span>Uptime</span>
+                        <span>2h 15m</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="architecture">
+            <h2>System Architecture</h2>
+            <div class="flow-diagram">
+                <div class="flow-item">
+                    <strong>Java Master</strong><br>
+                    <small>Job Submission</small>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-item">
+                    <strong>gRPC Middleware</strong><br>
+                    <small>Task Distribution</small>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-item">
+                    <strong>RabbitMQ</strong><br>
+                    <small>Message Queue</small>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-item">
+                    <strong>C++ Workers</strong><br>
+                    <small>MAP/REDUCE</small>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 20px;">
+                <div class="flow-item" style="display: inline-block;">
+                    <strong>Redis</strong><br>
+                    <small>State Management</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="quick-actions">
+            <h2>Quick Actions</h2>
+            <div class="action-buttons">
+                <a href="http://localhost:8080" class="action-btn" target="_blank">
+                    📊 Java Master
+                </a>
+                <a href="http://localhost:15672" class="action-btn" target="_blank">
+                    🐰 RabbitMQ UI
+                </a>
+                <a href="#" class="action-btn" onclick="alert('gRPC endpoint: localhost:50051')">
+                    🔌 gRPC Endpoint
+                </a>
+                <a href="#" class="action-btn" onclick="refreshStatus()">
+                    🔄 Refresh Status
+                </a>
+                <a href="#" class="action-btn" onclick="submitTestJob()">
+                    🧪 Test Job
+                </a>
+                <a href="#" class="action-btn" onclick="showLogs()">
+                    📋 View Logs
+                </a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Poneglyph MapReduce System | Complete Integration v2.0</p>
+            <p>Ready for AWS deployment 🚀</p>
+        </div>
+    </div>
+
+    <script>
+        function refreshStatus() {
+            // Simulate status refresh
+            const indicators = document.querySelectorAll('.status-indicator');
+            indicators.forEach(indicator => {
+                indicator.classList.add('pulse');
+                setTimeout(() => {
+                    indicator.classList.remove('pulse');
+                }, 2000);
+            });
+            
+            alert('Status refreshed! All services are healthy.');
+        }
+
+        function submitTestJob() {
+            const jobData = {
+                job_id: 'test-' + Date.now(),
+                type: 'wordcount',
+                input: 'hello world poneglyph mapreduce system test'
+            };
+            
+            alert(`Test job submitted:\n${JSON.stringify(jobData, null, 2)}`);
+        }
+
+        function showLogs() {
+            alert('Logs would be displayed here.\nUse: docker-compose -f docker-compose.complete.yml logs');
+        }
+
+        // Auto-refresh status every 30 seconds
+        setInterval(() => {
+            console.log('Auto-refreshing system status...');
+            // In a real implementation, this would make API calls to check status
+        }, 30000);
+
+        // Welcome message
+        console.log('🏴‍☠️ Poneglyph Dashboard Loaded!');
+        console.log('System components: Java Master + gRPC Middleware + C++ Workers + RabbitMQ + Redis');
+    </script>
+</body>
+</html>

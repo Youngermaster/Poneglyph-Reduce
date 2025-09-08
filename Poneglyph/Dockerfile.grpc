@@ -1,0 +1,41 @@
+FROM debian:bookworm-slim
+
+# Install dependencies including gRPC
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    curl \
+    python3 \
+    python3-pip \
+    pkg-config \
+    git \
+    libgrpc++-dev \
+    libprotobuf-dev \
+    protobuf-compiler-grpc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install grpcio-tools for Python script execution
+RUN pip3 install --break-system-packages grpcio grpcio-tools
+
+WORKDIR /app
+
+# Copy source files
+COPY . /app
+
+# Create CMakeLists.txt for gRPC support
+RUN echo 'cmake_minimum_required(VERSION 3.16)' > CMakeLists.txt && \
+    echo 'project(PoneglyphWorkerGRPC)' >> CMakeLists.txt && \
+    echo 'set(CMAKE_CXX_STANDARD 17)' >> CMakeLists.txt && \
+    echo 'find_package(PkgConfig REQUIRED)' >> CMakeLists.txt && \
+    echo 'pkg_check_modules(GRPC REQUIRED grpc++)' >> CMakeLists.txt && \
+    echo 'pkg_check_modules(PROTOBUF REQUIRED protobuf)' >> CMakeLists.txt && \
+    echo 'add_executable(Poneglyph main.cpp)' >> CMakeLists.txt && \
+    echo 'target_link_libraries(Poneglyph ${GRPC_LIBRARIES} ${PROTOBUF_LIBRARIES})' >> CMakeLists.txt && \
+    echo 'target_include_directories(Poneglyph PRIVATE ${GRPC_INCLUDE_DIRS} ${PROTOBUF_INCLUDE_DIRS})' >> CMakeLists.txt
+
+# Build the application
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build build
+
+# Run the worker
+CMD ["./build/Poneglyph"]

@@ -49,7 +49,20 @@ std::string get_json_str(const std::string &j, const std::string &key) {
         std::string val;
         while (p < j.size() && j[p] != '\"') {
             if (j[p] == '\\' && p + 1 < j.size()) {
-                val.push_back(j[p + 1]);
+                char next = j[p + 1];
+                if (next == 'n') {
+                    val.push_back('\n');
+                } else if (next == 't') {
+                    val.push_back('\t');
+                } else if (next == 'r') {
+                    val.push_back('\r');
+                } else if (next == '\\') {
+                    val.push_back('\\');
+                } else if (next == '\"') {
+                    val.push_back('\"');
+                } else {
+                    val.push_back(next);
+                }
                 p += 2;
                 continue;
             }
@@ -118,15 +131,12 @@ int main() {
         } else if (type == "REDUCE") {
             std::string reduceUrl = get_json_str(task, "reduce_url");
             std::string kvLines = get_json_str(task, "kv_lines");
+            
             // Guardar reduce input y script
             std::string rPy = http_get(master + reduceUrl);
             save_file("reduce.py", rPy);
-            // revertir \n escapados
-            for (size_t pos = 0; (pos = kvLines.find("\\n", pos)) != std::string::npos;) {
-                kvLines.replace(pos, 2, "\n");
-                pos++;
-            }
             save_file("reduce_in.txt", kvLines);
+            
             // Ejecutar reduce
             run("python3 reduce.py reduce_in.txt > reduce.out");
             std::string out = run("cat reduce.out");
