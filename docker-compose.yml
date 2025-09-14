@@ -19,8 +19,13 @@ services:
     build: ./Poneglyph
     depends_on:
       - master
+      - mqtt
     environment:
       PONEGLYPH_MASTER_URL: http://master:8080
+      MQTT_BROKER: tcp://mqtt:1883
+      MQTT_USERNAME: admin
+      MQTT_PASSWORD: public
+
 
   client:
     build: ./Clover
@@ -30,12 +35,25 @@ services:
     environment:
       MASTER: http://master:8080
 
+  dashboard:
+    build: ./dashboard
+    container_name: dashboard
+    ports:
+      - "3000:5173"
+    depends_on:
+      - mqtt
+      - master
+    environment:
+      - VITE_MQTT_HOST=localhost
+      - VITE_MQTT_PORT=8083
+      - VITE_MASTER_API=http://localhost:8080
+
   mqtt:
     image: emqx
     container_name: emqx
     ports:
-      - "1883:1883"   # MQTT
-      - "8083:8083"   # MQTT over WebSocket
+      - "1883:1883" # MQTT
+      - "8083:8083" # MQTT over WebSocket
       - "18083:18083" # EMQX Dashboard
     environment:
       - EMQX_DASHBOARD__DEFAULT_USERNAME=admin
