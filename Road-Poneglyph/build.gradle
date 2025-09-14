@@ -45,3 +45,6 @@ sourceSets {
         }
     }
 }
+
+// Fix dependency issue between compileJava and generateProto
+tasks.compileJava.dependsOn tasks.generateProto

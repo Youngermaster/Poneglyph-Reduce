@@ -10,7 +10,7 @@ COPY build.gradle settings.gradle ./
 COPY src ./src
 
 # Construcción distribución (bin + libs)
-RUN gradle --no-daemon clean installDist
+RUN gradle --no-daemon clean generateProto installDist
 
 FROM eclipse-temurin:17-jre
 WORKDIR /app
