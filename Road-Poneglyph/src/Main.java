@@ -1,11 +1,3 @@
-package src;
-
-import java.net.InetSocketAddress;
-import java.util.Map;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedBlockingQueue;
-
 import com.sun.net.httpserver.HttpServer;
 
 import api.JobsApi;
@@ -18,6 +10,11 @@ import model.JobCtx;
 import model.Task;
 import model.Worker;
 
+import java.net.InetSocketAddress;
+import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class Main {
 
