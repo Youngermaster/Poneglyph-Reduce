@@ -8,6 +8,8 @@ import core.Partitioner;
 import core.Scheduler;
 import http.HttpUtils;
 import model.*;
+import store.RedisStore;
+import telemetry.MqttClientManager;
 
 import java.io.IOException;
 import java.util.*;
@@ -67,10 +69,14 @@ public final class TasksApi {
     public static class CompleteHandler implements HttpHandler {
         private final Map<String, JobCtx> jobs;
         private final Scheduler scheduler;
+        private final MqttClientManager mqtt;
+        private final RedisStore redis;
 
-        public CompleteHandler(Map<String, JobCtx> jobs, Scheduler scheduler) {
+        public CompleteHandler(Map<String, JobCtx> jobs, Scheduler scheduler, MqttClientManager mqtt, RedisStore redis) {
             this.jobs = jobs;
             this.scheduler = scheduler;
+            this.mqtt = mqtt;
+            this.redis = redis;
         }
 
         @Override
@@ -101,21 +107,31 @@ public final class TasksApi {
                     if (kvp.length < 2) continue;
                     String k = kvp[0];
                     String v = kvp[1];
-                    int p = Partitioner.partitionOf(k, ctx.spec.reducers);
+                    int p = core.Partitioner.partitionOf(k, ctx.spec.reducers);
                     ctx.partitionKV.get(p).add(k + "\t" + v);
                     added++;
                 }
-                System.out.println("[MAP COMPLETE] job=" + jobId + " task=" + taskId + " kvAdded=" + added);
                 ctx.completedMaps++;
+                System.out.println("[MAP COMPLETE] job=" + jobId + " task=" + taskId + " kvAdded=" + added);
+
+                if (mqtt != null) {
+                    mqtt.publishJson("gridmr/job/" + jobId + "/map/completed", Map.of(
+                            "taskId", taskId, "added", added, "mapsCompleted", ctx.completedMaps, "ts", System.currentTimeMillis()
+                    ));
+                }
+                if (redis != null) {
+                    redis.saveJobCounters(jobId, ctx.completedMaps, ctx.completedReduces);
+                }
 
                 if (ctx.completedMaps == ctx.mapTasks.size()) {
                     // build reduce tasks only for non-empty partitions
                     int rIx = 0;
                     ctx.reduceTasks.clear();
+                    var sizes = new java.util.ArrayList<Integer>();
 
                     for (int i = 0; i < ctx.spec.reducers; i++) {
                         int sz = ctx.partitionKV.get(i).size();
-                        System.out.println("[SHUFFLE] job=" + jobId + " partition=" + i + " size=" + sz);
+                        sizes.add(sz);
                         if (sz == 0) continue;
 
                         Task rt = new Task();
@@ -127,10 +143,26 @@ public final class TasksApi {
                         ctx.reduceTasks.add(rt);
                         scheduler.enqueue(rt);
                     }
+                    if (mqtt != null) {
+                        mqtt.publishJson("gridmr/job/" + jobId + "/shuffle/partitions", Map.of(
+                                "sizes", sizes, "ts", System.currentTimeMillis()
+                        ));
+                    }
+                    if (redis != null) {
+                        redis.savePartitionSizes(jobId, sizes);
+                    }
                     if (ctx.reduceTasks.isEmpty()) {
-                        System.out.println("[REDUCE BYPASS] No data to reduce for job=" + jobId);
                         ctx.state = JobState.SUCCEEDED;
                         Scheduler.persistResult(ctx);
+                        if (redis != null) {
+                            redis.setJobState(jobId, ctx.state.toString());
+                            redis.storeFinalResult(jobId, ctx.finalOutput);
+                        }
+                        if (mqtt != null) {
+                            mqtt.publishJson("gridmr/job/" + jobId + "/state", Map.of(
+                                    "state", ctx.state.toString(), "ts", System.currentTimeMillis()
+                            ));
+                        }
                     }
                 }
                 HttpUtils.respondJson(ex, 200, Map.of("ack", true));
@@ -142,9 +174,27 @@ public final class TasksApi {
             ctx.completedReduces++;
             ctx.finalOutput += out + (out.endsWith("\n") ? "" : "\n");
 
+            if (mqtt != null) {
+                mqtt.publishJson("gridmr/job/" + jobId + "/reduce/completed", Map.of(
+                        "taskId", taskId, "reducesCompleted", ctx.completedReduces, "ts", System.currentTimeMillis()
+                ));
+            }
+            if (redis != null) {
+                redis.saveJobCounters(jobId, ctx.completedMaps, ctx.completedReduces);
+            }
+
             if (ctx.completedReduces == ctx.reduceTasks.size()) {
                 ctx.state = JobState.SUCCEEDED;
                 Scheduler.persistResult(ctx);
+                if (redis != null) {
+                    redis.setJobState(jobId, ctx.state.toString());
+                    redis.storeFinalResult(jobId, ctx.finalOutput);
+                }
+                if (mqtt != null) {
+                    mqtt.publishJson("gridmr/job/" + jobId + "/state", Map.of(
+                            "state", ctx.state.toString(), "ts", System.currentTimeMillis()
+                    ));
+                }
             }
             HttpUtils.respondJson(ex, 200, Map.of("ack", true));
         }

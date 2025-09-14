@@ -7,6 +7,8 @@ import core.Partitioner;
 import core.Scheduler;
 import http.HttpUtils;
 import model.*;
+import store.RedisStore;
+import telemetry.MqttClientManager;
 
 import java.io.IOException;
 import java.util.*;
@@ -27,10 +29,14 @@ public final class JobsApi {
     public static class SubmitHandler implements HttpHandler {
         private final Map<String, JobCtx> jobs;
         private final Scheduler scheduler;
+        private final MqttClientManager mqtt;
+        private final RedisStore redis;
 
-        public SubmitHandler(Map<String, JobCtx> jobs, Scheduler scheduler) {
+        public SubmitHandler(Map<String, JobCtx> jobs, Scheduler scheduler, MqttClientManager mqtt, RedisStore redis) {
             this.jobs = jobs;
             this.scheduler = scheduler;
+            this.mqtt = mqtt;
+            this.redis = redis;
         }
 
         @Override
@@ -54,6 +60,18 @@ public final class JobsApi {
 
                 jobs.put(spec.job_id, ctx);
                 scheduler.enqueueAll(ctx.mapTasks);
+
+                if (redis != null) {
+                    redis.saveJobSpec(spec);
+                    redis.setJobState(spec.job_id, ctx.state.toString());
+                    redis.saveJobCounters(spec.job_id, ctx.completedMaps, ctx.completedReduces);
+                }
+                if (mqtt != null) {
+                    mqtt.publishJson("gridmr/job/created", Map.of(
+                            "jobId", spec.job_id, "reducers", spec.reducers, "splitSize", splitSize,
+                            "maps", ctx.mapTasks.size(), "ts", System.currentTimeMillis()
+                    ));
+                }
 
                 HttpUtils.respondJson(ex, 200, Map.of("job_id", spec.job_id, "maps", ctx.mapTasks.size()));
                 return;
