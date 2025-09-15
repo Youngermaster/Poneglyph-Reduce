@@ -25,7 +25,8 @@ services:
       MQTT_BROKER: tcp://mqtt:1883
       MQTT_USERNAME: admin
       MQTT_PASSWORD: public
-
+      PONEGLYPH_USE_GRPC: "1"
+      PONEGLYPH_MASTER_GRPC: master:50051
 
   client:
     build: ./Clover
