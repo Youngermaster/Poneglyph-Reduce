@@ -93,9 +93,15 @@ function App() {
         {/* Main Content */}
         <Tabs defaultValue="overview" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="flow">Flow Visualization</TabsTrigger>
-            <TabsTrigger value="logs">Real-time Logs</TabsTrigger>
+            <TabsTrigger value="overview" className="text-white">
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="flow" className="text-white">
+              Flow Visualization
+            </TabsTrigger>
+            <TabsTrigger value="logs" className="text-white">
+              Real-time Logs
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
