@@ -15,30 +15,30 @@ message WorkerRegisterResponse {
 }
 
 // ---- Task dispatch ----
-message NextTaskRequest { string worker_id = 1; }
+message NextTaskRequest {string worker_id = 1;}
 
 message MapTask {
-  string task_id    = 1;
-  string job_id     = 2;
-  string input_chunk= 3;
-  string map_url    = 4;  // HTTP fallback for script
-  int32  reducers   = 5;
+  string task_id = 1;
+  string job_id = 2;
+  string input_chunk = 3;
+  string map_url = 4;  // HTTP fallback for script
+  int32  reducers = 5;
   bytes  map_script = 6;  // optional: can be empty
 }
 
 message ReduceTask {
-  string task_id       = 1;
-  string job_id        = 2;
+  string task_id = 1;
+  string job_id = 2;
   int32  partition_index = 3;
-  string reduce_url    = 4; // HTTP fallback
-  string kv_lines      = 5;
+  string reduce_url = 4; // HTTP fallback
+  string kv_lines = 5;
   bytes  reduce_script = 6; // optional
 }
 
 message TaskAssignment {
   bool has_task = 1;
   oneof task {
-    MapTask    map    = 2;
+    MapTask    map = 2;
     ReduceTask reduce = 3;
   }
 }
@@ -46,18 +46,18 @@ message TaskAssignment {
 // ---- Completion ----
 message CompleteMapRequest {
   string worker_id = 1;
-  string task_id   = 2;
-  string job_id    = 3;
-  string kv_lines  = 4;
+  string task_id = 2;
+  string job_id = 3;
+  string kv_lines = 4;
 }
 message CompleteReduceRequest {
   string worker_id = 1;
-  string task_id   = 2;
-  string job_id    = 3;
-  string output    = 4;
+  string task_id = 2;
+  string job_id = 3;
+  string output = 4;
 }
 
-message Ack { bool ok = 1; }
+message Ack {bool ok = 1;}
 
 // ---- Service ----
 service Master {

@@ -30,8 +30,11 @@ public final class RedisStore implements AutoCloseable {
     }
 
     public boolean healthy() {
-        try { return "PONG".equalsIgnoreCase(jedis.ping()); }
-        catch (Exception e) { return false; }
+        try {
+            return "PONG".equalsIgnoreCase(jedis.ping());
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     // --- Workers ---
@@ -39,10 +42,10 @@ public final class RedisStore implements AutoCloseable {
         if (jedis == null) return;
         String key = "gridmr:workers:" + w.workerId;
         jedis.hset(key, Map.of(
-            "workerId", w.workerId,
-            "name", w.name,
-            "capacity", String.valueOf(w.capacity),
-            "lastHeartbeat", String.valueOf(w.lastHeartbeat)
+                "workerId", w.workerId,
+                "name", w.name,
+                "capacity", String.valueOf(w.capacity),
+                "lastHeartbeat", String.valueOf(w.lastHeartbeat)
         ));
     }
 
@@ -56,8 +59,8 @@ public final class RedisStore implements AutoCloseable {
         if (jedis == null) return;
         String key = "gridmr:jobs:" + jobId + ":counters";
         jedis.hset(key, Map.of(
-            "maps_completed", String.valueOf(mapsCompleted),
-            "reduces_completed", String.valueOf(reducesCompleted)
+                "maps_completed", String.valueOf(mapsCompleted),
+                "reduces_completed", String.valueOf(reducesCompleted)
         ));
     }
 
@@ -76,7 +79,11 @@ public final class RedisStore implements AutoCloseable {
         jedis.set("gridmr:jobs:" + jobId + ":result", output);
     }
 
-    @Override public void close() {
-        try { if (jedis != null) jedis.close(); } catch (Exception ignored) {}
+    @Override
+    public void close() {
+        try {
+            if (jedis != null) jedis.close();
+        } catch (Exception ignored) {
+        }
     }
 }

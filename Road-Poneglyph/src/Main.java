@@ -32,7 +32,7 @@ public class Main {
         // Infra managers (optional if services are down)
         MqttClientManager mqtt = MqttClientManager.fromEnvOrNull();
         RedisStore redis = RedisStore.fromEnvOrNull();
-        
+
         // Inicializar SmartScheduler
         smartScheduler = new SmartScheduler(pendingTasks, workers, mqtt);
 
@@ -61,7 +61,7 @@ public class Main {
         // Tasks
         server.createContext("/api/tasks/next", new TasksApi.SmartNextHandler(jobs, smartScheduler));
         server.createContext("/api/tasks/complete", new TasksApi.SmartCompleteHandler(jobs, smartScheduler, mqtt, redis));
-        
+
         // Scheduler stats
         server.createContext("/api/scheduler/stats", ex -> {
             if (!"GET".equals(ex.getRequestMethod())) {
@@ -70,7 +70,7 @@ public class Main {
             }
             HttpUtils.respondJson(ex, 200, smartScheduler.getSchedulerStats());
         });
-        
+
         server.start();
         System.out.println("Road-Poneglyph HTTP listening on :8080");
 

@@ -1,5 +1,5 @@
 services:
-    master:
+  master:
     build: ./Road-Poneglyph
     container_name: road-poneglyph
     ports:

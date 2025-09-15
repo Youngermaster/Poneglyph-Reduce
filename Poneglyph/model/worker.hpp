@@ -24,7 +24,7 @@ private:
     void startHeartbeat();
 
     static long long now_ms();
-    
+
     std::pair<double, double> getSystemMetrics();
 
     void handleMap(const std::string &taskJson);
