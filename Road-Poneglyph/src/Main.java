@@ -4,6 +4,8 @@ import api.JobsApi;
 import api.TasksApi;
 import api.WorkersApi;
 import core.Scheduler;
+import core.SmartScheduler;
+import grpc.gRPCUtils;
 import http.HttpUtils;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -23,12 +25,16 @@ public class Main {
     private static final Map<String, Worker> workers = new ConcurrentHashMap<>();
     private static final Map<String, JobCtx> jobs = new ConcurrentHashMap<>();
     private static final BlockingQueue<Task> pendingTasks = new LinkedBlockingQueue<>();
+    private static SmartScheduler smartScheduler;
     private static final Scheduler scheduler = new Scheduler(pendingTasks);
 
     public static void main(String[] args) throws Exception {
         // Infra managers (optional if services are down)
         MqttClientManager mqtt = MqttClientManager.fromEnvOrNull();
         RedisStore redis = RedisStore.fromEnvOrNull();
+        
+        // Inicializar SmartScheduler
+        smartScheduler = new SmartScheduler(pendingTasks, workers, mqtt);
 
         // ---- HTTP ----
         int port = 8080;
@@ -43,16 +49,28 @@ public class Main {
 
         // Workers
         server.createContext("/api/workers/register", new WorkersApi.RegisterHandler(workers, mqtt, redis));
+        server.createContext("/api/workers/heartbeat", new WorkersApi.HeartbeatHandler(workers, mqtt));
 
-        server.createContext("/api/jobs", new JobsApi.SubmitHandler(jobs, scheduler, mqtt, redis));
+        // Jobs
+        server.createContext("/api/jobs", new JobsApi.SubmitHandler(jobs, smartScheduler, mqtt, redis));
         server.createContext("/api/jobs/status", new JobsApi.StatusHandler(jobs));
         server.createContext("/api/jobs/result", new JobsApi.ResultHandler(jobs));
         server.createContext("/api/jobs/debug", new JobsApi.DebugHandler(jobs));
         server.createContext("/api/jobs/scripts", new JobsApi.ScriptsHandler(jobs));
 
-        server.createContext("/api/tasks/next", new TasksApi.NextHandler(jobs, pendingTasks));
-        server.createContext("/api/tasks/complete", new TasksApi.CompleteHandler(jobs, scheduler, mqtt, redis));
-
+        // Tasks
+        server.createContext("/api/tasks/next", new TasksApi.SmartNextHandler(jobs, smartScheduler));
+        server.createContext("/api/tasks/complete", new TasksApi.SmartCompleteHandler(jobs, smartScheduler, mqtt, redis));
+        
+        // Scheduler stats
+        server.createContext("/api/scheduler/stats", ex -> {
+            if (!"GET".equals(ex.getRequestMethod())) {
+                HttpUtils.respond(ex, 405, "", "");
+                return;
+            }
+            HttpUtils.respondJson(ex, 200, smartScheduler.getSchedulerStats());
+        });
+        
         server.start();
         System.out.println("Road-Poneglyph HTTP listening on :8080");
 

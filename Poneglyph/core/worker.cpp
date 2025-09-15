@@ -19,32 +19,72 @@ long long Worker::now_ms() {
 }
 
 void Worker::registerSelf() {
-    std::string reg = http_post_json(master + "/api/workers/register",
-                                     R"({"name":"ohara-scribe","capacity":1})");
+    // Obtener métricas del sistema para el registro
+    auto [cpuUsage, memUsage] = getSystemMetrics();
+    
+    std::ostringstream registrationPayload;
+    registrationPayload << "{"
+                        << "\"name\":\"poneglyph-worker\","
+                        << "\"capacity\":2,"  // Capacidad de tareas concurrentes
+                        << "\"cpu_cores\":4,"  // Número de cores simulados
+                        << "\"memory_mb\":8192,"  // 8GB de memoria simulada
+                        << "\"cpu_usage\":" << cpuUsage << ","
+                        << "\"memory_usage\":" << memUsage
+                        << "}";
+    
+    std::string reg = http_post_json(master + "/api/workers/register", registrationPayload.str());
+    std::cout << "Registration response: " << reg << std::endl;
     workerId = get_json_str(reg, "worker_id");
     std::cout << "Registered as " << workerId << std::endl;
 
     if (mqtt) {
         std::ostringstream j;
         j << "{\"workerId\":\"" << workerId << "\","
-                << "\"name\":\"ohara-scribe\",\"capacity\":1,"
+                << "\"name\":\"poneglyph-worker\",\"capacity\":2,"
+                << "\"cpu_cores\":4,\"memory_mb\":8192,"
                 << "\"ts\":" << now_ms() << "}";
         mqtt->publish_json("gridmr/worker/registered", j.str());
     }
 }
 
 void Worker::startHeartbeat() {
-    if (!mqtt) return;
     std::thread([this] {
         while (true) {
             if (!workerId.empty()) {
-                std::ostringstream j;
-                j << "{\"ts\":" << now_ms() << "}";
-                mqtt->publish_json("gridmr/worker/" + workerId + "/heartbeat", j.str());
+                // Obtener métricas básicas del sistema
+                auto [cpuUsage, memUsage] = getSystemMetrics();
+                
+                // Enviar heartbeat al Master via HTTP
+                std::ostringstream heartbeatJson;
+                heartbeatJson << "{\"worker_id\":\"" << workerId << "\","
+                             << "\"cpu_usage\":" << cpuUsage << ","
+                             << "\"memory_usage\":" << memUsage << ","
+                             << "\"ts\":" << now_ms() << "}";
+                
+                try {
+                    http_post_json(master + "/api/workers/heartbeat", heartbeatJson.str());
+                } catch (const std::exception& e) {
+                    std::cerr << "Heartbeat failed: " << e.what() << std::endl;
+                }
+                
+                // También publicar via MQTT para el dashboard
+                if (mqtt) {
+                    mqtt->publish_json("gridmr/worker/" + workerId + "/heartbeat", heartbeatJson.str());
+                }
             }
-            std::this_thread::sleep_for(std::chrono::seconds(5));
+            std::this_thread::sleep_for(std::chrono::seconds(10)); // Cada 10 segundos
         }
     }).detach();
+}
+
+std::pair<double, double> Worker::getSystemMetrics() {
+    // Implementación básica de métricas del sistema
+    // En un sistema real, esto leería /proc/stat, /proc/meminfo, etc.
+    
+    double cpuUsage = 0.1 + (rand() % 30) / 100.0;  // Simular 10-40% CPU
+    double memUsage = 0.2 + (rand() % 40) / 100.0;  // Simular 20-60% memoria
+    
+    return {cpuUsage, memUsage};
 }
 
 void Worker::handleMap(const std::string &taskJson) {
