@@ -4,13 +4,28 @@ services:
     container_name: road-poneglyph
     ports:
       - "8080:8080"
+    environment:
+      # MQTT (EMQX)
+      - MQTT_BROKER=tcp://mqtt:1883
+      - MQTT_USERNAME=admin
+      - MQTT_PASSWORD=public
+      # Redis
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - mqtt
+      - redis
 
   worker:
     build: ./Poneglyph
     depends_on:
       - master
+      - mqtt
     environment:
       PONEGLYPH_MASTER_URL: http://master:8080
+      MQTT_BROKER: tcp://mqtt:1883
+      MQTT_USERNAME: admin
+      MQTT_PASSWORD: public
+
 
   client:
     build: ./Clover
@@ -19,3 +34,47 @@ services:
       - worker
     environment:
       MASTER: http://master:8080
+
+  dashboard:
+    build: ./dashboard
+    container_name: dashboard
+    ports:
+      - "3000:5173"
+    depends_on:
+      - mqtt
+      - master
+    environment:
+      - VITE_MQTT_HOST=localhost
+      - VITE_MQTT_PORT=8083
+      - VITE_MASTER_API=http://localhost:8080
+
+  mqtt:
+    image: emqx
+    container_name: emqx
+    ports:
+      - "1883:1883" # MQTT
+      - "8083:8083" # MQTT over WebSocket
+      - "18083:18083" # EMQX Dashboard
+    environment:
+      - EMQX_DASHBOARD__DEFAULT_USERNAME=admin
+      - EMQX_DASHBOARD__DEFAULT_PASSWORD=public
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: redisinsight
+    depends_on:
+      - redis
+    ports:
+      - "5540:5540"
+
+volumes:
+  redis-data:
