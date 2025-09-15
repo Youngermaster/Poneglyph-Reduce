@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import type { JobProgress } from "../types/mqtt";
+import type { JobProgress } from "@/types/mqtt";
 import { Clock, CheckCircle, XCircle, Loader2 } from "lucide-react";
 
 interface JobCardProps {

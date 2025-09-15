@@ -25,12 +25,12 @@ function App() {
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
               Poneglyph MapReduce Dashboard
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground pt-4">
               Real-time monitoring for distributed MapReduce cluster
             </p>
           </div>
