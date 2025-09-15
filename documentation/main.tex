@@ -1,0 +1,39 @@
+\documentclass[a4paper, table]{article}
+\input{General/Preamble} % Loads in the preamble 
+\input{General/Settings} % Loads in user defined settings
+\usepackage{hyperref}
+\begin{document}
+
+% Inserts the front page
+\input{Chapters/0. Frontpage}\pagenumbering{arabic}
+\newpage
+
+% Generates a ToC without page number
+{\hypersetup{linkcolor=black} % Keeps the ToC black even with non-black linkcolor
+\tableofcontents\thispagestyle{empty}}
+\newpage
+
+\input{Chapters/1. Introduccion}
+\newpage
+
+\input{Chapters/3. Arquitectura}
+\newpage
+
+\input{Chapters/4. Protocolos}
+\newpage
+
+\input{Chapters/5. Implementacion}
+\newpage
+
+\input{Chapters/6. Entorno}
+\newpage
+
+\input{Chapters/7. Resultados}
+\newpage
+
+\input{Chapters/8. Conclusiones}
+\newpage
+\bibliographystyle{plainurl} % estilo básico con URLs clickeables
+\bibliography{General/References}
+
+\end{document}

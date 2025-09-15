@@ -1,0 +1,324 @@
+% -----------------------------------------------------------------
+% 6. Entorno de Ejecución y Despliegue
+% -----------------------------------------------------------------
+\section{Entorno de Ejecución y Despliegue}
+
+\subsection{Arquitectura de Contenedores}
+
+El sistema está completamente containerizado utilizando Docker, permitiendo despliegue distribuido a través de Internet con máxima portabilidad.
+
+\subsubsection{Composición del Sistema}
+
+El archivo \texttt{docker-compose.yml} define la arquitectura completa del sistema:
+
+\begin{verbatim}
+services:
+  master:          # Road-Poneglyph (Java)
+  worker:          # Poneglyph (C++20) - escalable
+  client:          # Clover (Python)
+  dashboard:       # React+TypeScript
+  mqtt:            # EMQX broker
+  redis:           # Almacenamiento de estado
+  redisinsight:    # Herramienta de monitoreo Redis
+\end{verbatim}
+
+\subsubsection{Road-Poneglyph (Master) Container}
+
+\textbf{Dockerfile:}
+\begin{verbatim}
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY build/libs/road-poneglyph.jar app.jar
+EXPOSE 8080 50051
+CMD ["java", "-jar", "app.jar"]
+\end{verbatim}
+
+\textbf{Configuración:}
+\begin{itemize}
+    \item \textbf{Puerto HTTP:} 8080 para API REST (clientes)
+    \item \textbf{Puerto gRPC:} 50051 para comunicación con trabajadores
+    \item \textbf{Variables de entorno:}
+    \begin{itemize}
+        \item \texttt{MQTT\_BROKER}: Conexión a broker EMQX
+        \item \texttt{REDIS\_URL}: Conexión a almacenamiento de estado
+        \item \texttt{GRPC\_PORT}: Puerto de servicio gRPC
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{Poneglyph (Worker) Container}
+
+\textbf{Dockerfile:}
+\begin{verbatim}
+FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y \
+    build-essential cmake python3 python3-pip curl \
+    libssl-dev libcurl4-openssl-dev
+
+WORKDIR /app
+COPY . .
+RUN cmake -B build && cmake --build build
+
+CMD ["./build/Poneglyph"]
+\end{verbatim}
+
+\textbf{Características:}
+\begin{itemize}
+    \item \textbf{Escalabilidad horizontal:} \texttt{docker-compose up --scale worker=N}
+    \item \textbf{Dependencias nativas:} C++20, Python3, libcurl, OpenSSL
+    \item \textbf{Auto-registro:} Registro automático con maestro al inicializar
+    \item \textbf{Heartbeat:} Telemetría continua vía MQTT
+\end{itemize}
+
+\subsection{Infraestructura de Soporte}
+
+\subsubsection{EMQX (MQTT Broker)}
+
+\begin{verbatim}
+mqtt:
+  image: emqx
+  ports:
+    - "1883:1883"   # MQTT nativo
+    - "8083:8083"   # WebSocket para dashboard
+    - "18083:18083" # Panel de administración
+  environment:
+    - EMQX_DASHBOARD__DEFAULT_USERNAME=admin
+    - EMQX_DASHBOARD__DEFAULT_PASSWORD=public
+\end{verbatim}
+
+\textbf{Funcionalidades:}
+\begin{itemize}
+    \item \textbf{Telemetría en tiempo real:} Eventos de trabajos y trabajadores
+    \item \textbf{Dashboard web:} Alimenta visualización React en tiempo real
+    \item \textbf{Persistencia de mensajes:} Retención para análisis posterior
+    \item \textbf{Escalabilidad:} Soporte para miles de clientes concurrentes
+\end{itemize}
+
+\subsubsection{Redis (Almacenamiento de Estado)}
+
+\begin{verbatim}
+redis:
+  image: redis:7-alpine
+  command: ["redis-server", "--appendonly", "yes"]
+  ports:
+    - "6379:6379"
+  volumes:
+    - redis-data:/data
+\end{verbatim}
+
+\textbf{Esquema de Datos:}
+\begin{itemize}
+    \item \texttt{gridmr:jobs:\{job\_id\}:spec} - Especificación completa del trabajo
+    \item \texttt{gridmr:jobs:\{job\_id\}:state} - Estado actual (PENDING/RUNNING/SUCCEEDED/FAILED)
+    \item \texttt{gridmr:jobs:\{job\_id\}:counters} - Contadores de progreso
+    \item \texttt{gridmr:jobs:\{job\_id\}:partitions} - Tamaños de particiones post-shuffle
+    \item \texttt{gridmr:jobs:\{job\_id\}:result} - Resultado final consolidado
+    \item \texttt{gridmr:workers:\{worker\_id\}} - Información de trabajadores registrados
+\end{itemize}
+
+\subsubsection{Dashboard Web (React + TypeScript)}
+
+\begin{verbatim}
+dashboard:
+  build: ./dashboard
+  ports:
+    - "3000:5173"
+  environment:
+    - VITE_MQTT_HOST=localhost
+    - VITE_MQTT_PORT=8083
+    - VITE_MASTER_API=http://localhost:8080
+\end{verbatim}
+
+\textbf{Tecnologías:}
+\begin{itemize}
+    \item \textbf{React 19:} Framework de UI moderno
+    \item \textbf{TypeScript:} Tipado estático para robustez
+    \item \textbf{Vite:} Build tool optimizado
+    \item \textbf{TailwindCSS + shadcn/ui:} Sistema de diseño moderno
+    \item \textbf{React Flow:} Visualización interactiva de flujos
+    \item \textbf{MQTT.js:} Cliente WebSocket para tiempo real
+\end{itemize}
+
+\subsection{Despliegue y Operación}
+
+\subsubsection{Inicio del Sistema}
+
+\textbf{Comando básico:}
+\begin{verbatim}
+# Levantar cluster completo con 3 trabajadores
+docker-compose up --build --scale worker=3 -d
+
+# Verificar estado de servicios
+docker-compose ps
+
+# Seguir logs del maestro
+docker logs -f road-poneglyph
+\end{verbatim}
+
+\textbf{Puertos expuestos:}
+\begin{itemize}
+    \item \textbf{8080:} API REST del maestro
+    \item \textbf{50051:} gRPC del maestro (interno)
+    \item \textbf{3000:} Dashboard web
+    \item \textbf{1883:} MQTT nativo
+    \item \textbf{8083:} MQTT WebSocket
+    \item \textbf{18083:} Panel EMQX
+    \item \textbf{6379:} Redis
+    \item \textbf{5540:} RedisInsight
+\end{itemize}
+
+\subsubsection{Ejecución de Trabajos}
+
+\textbf{Envío de trabajo ejemplo:}
+\begin{verbatim}
+# Ejecutar cliente WordCount
+docker-compose run --rm client
+
+# Verificar resultado via API
+curl -s "http://localhost:8080/api/jobs/result?job_id=wordcount-001"
+\end{verbatim}
+
+\textbf{Monitoreo en tiempo real:}
+\begin{verbatim}
+# Dashboard web
+open http://localhost:3000
+
+# Eventos MQTT en vivo
+docker run --rm eclipse-mosquitto mosquitto_sub \
+  -h localhost -p 1883 -t 'gridmr/#' -v
+\end{verbatim}
+
+\subsection{Configuración para Producción}
+
+\subsubsection{Consideraciones de Red}
+
+\textbf{Distribución geográfica:}
+\begin{itemize}
+    \item \textbf{Exposición de puertos:} Configurar firewalls para puertos necesarios
+    \item \textbf{DNS/Load balancing:} Múltiples maestros con balanceador
+    \item \textbf{Latencia de red:} Ajustar timeouts según latencia esperada
+    \item \textbf{Ancho de banda:} Dimensionar según volumen de datos
+\end{itemize}
+
+\textbf{Seguridad:}
+\begin{itemize}
+    \item \textbf{TLS:} Encriptación de comunicaciones gRPC/MQTT
+    \item \textbf{Autenticación:} Tokens JWT para trabajadores
+    \item \textbf{Autorización:} Permisos granulares por tipo de tarea
+    \item \textbf{Network policies:} Restricción de comunicaciones entre servicios
+\end{itemize}
+
+\subsubsection{Escalabilidad}
+
+\textbf{Escalado horizontal de trabajadores:}
+\begin{verbatim}
+# Agregar trabajadores dinámicamente
+docker-compose up --scale worker=10 -d
+
+# Despliegue en múltiples máquinas
+docker stack deploy -c docker-compose.yml gridmr-stack
+\end{verbatim}
+
+\textbf{Alta disponibilidad del maestro:}
+\begin{itemize}
+    \item \textbf{Múltiples instancias:} Load balancer con health checks
+    \item \textbf{Estado compartido:} Redis cluster para persistencia distribuida
+    \item \textbf{Failover automático:} Detección y promoción de instancias backup
+\end{itemize}
+
+\subsection{Monitoreo y Observabilidad}
+
+\subsubsection{Métricas del Sistema}
+
+\textbf{Métricas de trabajos:}
+\begin{itemize}
+    \item Trabajos activos/completados/fallidos
+    \item Tiempo promedio de ejecución por tipo de tarea
+    \item Throughput de tareas por segundo
+    \item Distribución de tamaños de datos procesados
+\end{itemize}
+
+\textbf{Métricas de trabajadores:}
+\begin{itemize}
+    \item Número de trabajadores activos/registrados
+    \item Utilización promedio de capacidad
+    \item Latencia de heartbeat
+    \item Tasa de fallos por trabajador
+\end{itemize}
+
+\textbf{Métricas de infraestructura:}
+\begin{itemize}
+    \item Uso de CPU/memoria por servicio
+    \item Latencia de red entre componentes
+    \item Throughput de mensajes MQTT
+    \item Operaciones Redis por segundo
+\end{itemize}
+
+\subsubsection{Logging Centralizado}
+
+\textbf{Fuentes de logs:}
+\begin{itemize}
+    \item \textbf{Maestro:} Eventos de planificación, shuffle, consolidación
+    \item \textbf{Trabajadores:} Ejecución de tareas, errores de scripts
+    \item \textbf{MQTT:} Eventos de telemetría en tiempo real
+    \item \textbf{Dashboard:} Interacciones de usuario, errores de frontend
+\end{itemize}
+
+\textbf{Integración con stacks de observabilidad:}
+\begin{verbatim}
+# Ejemplo con ELK stack
+version: '3.8'
+services:
+  # ... servicios existentes ...
+  
+  elasticsearch:
+    image: elasticsearch:8.x
+  
+  logstash:
+    image: logstash:8.x
+    depends_on: [elasticsearch]
+  
+  kibana:
+    image: kibana:8.x
+    depends_on: [elasticsearch]
+    ports: ["5601:5601"]
+\end{verbatim}
+
+\subsection{Mantenimiento y Operaciones}
+
+\subsubsection{Backup y Recuperación}
+
+\textbf{Datos críticos a respaldar:}
+\begin{itemize}
+    \item Estado de trabajos en Redis
+    \item Scripts de map/reduce de trabajos activos
+    \item Configuración del sistema
+    \item Logs históricos de MQTT
+\end{itemize}
+
+\textbf{Procedimiento de backup:}
+\begin{verbatim}
+# Backup automático de Redis
+docker exec redis redis-cli BGSAVE
+docker cp redis:/data/dump.rdb ./backups/redis-$(date +%Y%m%d).rdb
+
+# Backup de configuración
+tar czf config-backup-$(date +%Y%m%d).tgz docker-compose.yml env/
+\end{verbatim}
+
+\subsubsection{Actualizaciones del Sistema}
+
+\textbf{Estrategia de rolling updates:}
+\begin{enumerate}
+    \item Actualizar trabajadores gradualmente (sin interrumpir trabajos activos)
+    \item Actualizar servicios de soporte (Redis, MQTT) durante ventanas de mantenimiento
+    \item Actualizar maestro con failover temporal a instancia secundaria
+    \item Verificar compatibilidad de protocolos gRPC entre versiones
+\end{enumerate}
+
+\textbf{Rollback automático:}
+\begin{itemize}
+    \item Health checks automáticos post-actualización
+    \item Rollback automático si health checks fallan
+    \item Preservación de estado durante el proceso
+    \item Notificaciones automáticas de estado de actualización
+\end{itemize}

@@ -25,6 +25,8 @@ private:
 
     static long long now_ms();
 
+    std::pair<double, double> getSystemMetrics();
+
     void handleMap(const std::string &taskJson);
 
     void handleReduce(const std::string &taskJson);

@@ -1,0 +1,57 @@
+% -----------------------------------------------------------------
+% 1. Introducción y Descripción del Sistema
+% -----------------------------------------------------------------
+\section{Introducción}
+
+\subsection{Objetivo General}
+
+El proyecto \textbf{Poneglyph-Reduce} implementa un sistema de procesamiento distribuido basado en el paradigma MapReduce, diseñado para operar sobre una red de nodos heterogéneos y débilmente acoplados (Grid Computing). El sistema permite a clientes externos enviar tareas de procesamiento intensivo que son ejecutadas de forma distribuida y paralela.
+
+\subsection{Descripción del Problema}
+
+Los sistemas de procesamiento de datos a gran escala requieren capacidad de distribución del trabajo entre múltiples nodos computacionales para manejar volúmenes masivos de información. El paradigma MapReduce, popularizado por Google \cite{MapReduceGoogle} y implementado en sistemas como Hadoop y Apache Spark \cite{SparkClusters}, proporciona un modelo de programación simple pero potente para el procesamiento distribuido.
+
+\textbf{Poneglyph-Reduce} aborda este desafío implementando un sistema GridMR que permite:
+
+\begin{itemize}
+    \item Procesamiento distribuido de grandes volúmenes de datos
+    \item Ejecución paralela de tareas Map y Reduce
+    \item Comunicación eficiente entre nodos a través de Internet
+    \item Tolerancia a fallos mediante persistencia de estado
+    \item Monitoreo en tiempo real del progreso de las tareas
+\end{itemize}
+
+\subsection{Aplicaciones Soportadas}
+
+El sistema está diseñado para soportar una amplia gama de aplicaciones computacionales intensivas:
+
+\begin{itemize}
+    \item \textbf{Análisis estadístico distribuido:} Procesamiento de grandes conjuntos de datos para ciencia de datos
+    \item \textbf{Indexación invertida:} Construcción de índices para motores de búsqueda y sistemas de recuperación de información
+    \item \textbf{Cálculo de PageRank:} Análisis de grafos distribuidos para ranking de páginas web
+    \item \textbf{Aprendizaje automático distribuido:} Entrenamiento de modelos simples (regresión, clustering)
+    \item \textbf{Simulaciones físicas:} Métodos Monte Carlo, autómatas celulares, y otras simulaciones computacionales
+\end{itemize}
+
+\subsection{Inspiración y Referencias}
+
+El diseño del sistema está fuertemente inspirado en los trabajos fundacionales:
+
+\begin{itemize}
+    \item \textbf{MapReduce de Google:} El paper seminal de Jeffrey Dean y Sanjay Ghemawat \cite{MapReduceGoogle} que establece los principios fundamentales del paradigma MapReduce
+    \item \textbf{Apache Spark:} El enfoque de Matei Zaharia et al. \cite{SparkClusters} para el procesamiento distribuido con conjuntos de datos resilientes distribuidos (RDDs)
+\end{itemize}
+
+Estos sistemas han demostrado su eficacia en el procesamiento de petabytes de datos en clusters de miles de nodos, proporcionando un modelo de programación accesible que abstrae la complejidad de la distribución, paralelización y tolerancia a fallos.
+
+\subsection{Nomenclatura Temática: One Piece}
+
+El proyecto adopta una nomenclatura temática inspirada en el anime \emph{One Piece}, donde cada componente representa un elemento del universo narrativo:
+
+\begin{itemize}
+    \item \textbf{Road-Poneglyph (Maestro):} Como los cuatro "Road Poneglyphs" que conducen a Laugh Tale, el nodo maestro coordina y conoce el camino hacia la respuesta final
+    \item \textbf{Poneglyph (Trabajadores):} Los Poneglyphs "regulares" que contienen fragmentos de información, representando los agentes que procesan fragmentos y producen conocimiento intermedio
+    \item \textbf{Clover (Cliente):} Inspirado en el Profesor Clover de Ohara, quien puede \emph{leer} y \emph{enviar} tareas, interactuando con los Poneglyphs para revelar la historia final
+\end{itemize}
+
+Esta nomenclatura no solo proporciona coherencia al proyecto, sino que también refleja conceptualmente la naturaleza distribuida del sistema donde fragmentos de información se procesan independientemente para construir un resultado completo.

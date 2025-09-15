@@ -1,0 +1,304 @@
+% -----------------------------------------------------------------
+% 5. Implementación y Algoritmos
+% -----------------------------------------------------------------
+\section{Implementación del Sistema}
+
+\subsection{Algoritmo MapReduce Distribuido}
+
+El sistema implementa el paradigma MapReduce clásico adaptado para un entorno distribuido con tolerancia a fallos.
+
+\subsubsection{Flujo Principal del Algoritmo}
+
+\begin{enumerate}
+    \item \textbf{Envío (Submit):} Cliente envía paquete de trabajo con:
+    \begin{itemize}
+        \item Scripts map/reduce codificados en Base64
+        \item Parámetros de particionamiento (split\_size, reducers)
+        \item Datos de entrada o referencia a los mismos
+    \end{itemize}
+    
+    \item \textbf{Particionamiento (Split):} Maestro divide entrada en fragmentos:
+    \begin{verbatim}
+    for chunk in split_input(input_text, split_size):
+        create_map_task(chunk_id, chunk_data)
+        enqueue_task(map_task)
+    \end{verbatim}
+    
+    \item \textbf{Fase Map:} Trabajadores procesan fragmentos en paralelo:
+    \begin{verbatim}
+    for each map_task assigned:
+        intermediate_kvs = execute_map(chunk, map_script)
+        return intermediate_kvs to master
+    \end{verbatim}
+    
+    \item \textbf{Shuffle:} Maestro particiona resultados intermedios:
+    \begin{verbatim}
+    partitions = [[] for _ in range(num_reducers)]
+    for key, value in all_intermediate_kvs:
+        partition_id = hash(key) % num_reducers
+        partitions[partition_id].append((key, value))
+    \end{verbatim}
+    
+    \item \textbf{Fase Reduce:} Trabajadores reducen particiones agrupadas:
+    \begin{verbatim}
+    for each reduce_task assigned:
+        grouped_kvs = group_by_key(partition_data)
+        final_output = execute_reduce(grouped_kvs, reduce_script)
+        return final_output to master
+    \end{verbatim}
+    
+    \item \textbf{Consolidación:} Maestro concatena salidas finales
+\end{enumerate}
+
+\subsection{Planificación y Asignación de Tareas}
+
+\subsubsection{Algoritmo de Planificación}
+
+El maestro implementa un planificador basado en disponibilidad con consideraciones de capacidad:
+
+\begin{verbatim}
+class Scheduler {
+    BlockingQueue<Task> pending_tasks;
+    Map<String, Worker> available_workers;
+    
+    void schedule_job(JobSpec spec) {
+        // Crear tareas MAP
+        for (chunk : split_input(spec.input, spec.split_size)) {
+            Task map_task = new Task(MAP, chunk, spec.job_id);
+            pending_tasks.offer(map_task);
+        }
+    }
+    
+    Task get_next_task(String worker_id) {
+        Worker worker = available_workers.get(worker_id);
+        if (worker != null && worker.capacity > 0) {
+            return pending_tasks.poll(); // FIFO
+        }
+        return null; // Sin tareas disponibles
+    }
+}
+\end{verbatim}
+
+\subsubsection{Criterios de Asignación}
+
+\begin{itemize}
+    \item \textbf{Disponibilidad:} Trabajadores deben estar registrados y activos
+    \item \textbf{Capacidad:} Verificación de capacidad de procesamiento declarada
+    \item \textbf{FIFO simple:} Asignación por orden de llegada (v1)
+    \item \textbf{Balance de carga:} Distribución equitativa entre trabajadores disponibles
+\end{itemize}
+
+\textbf{Extensiones futuras:}
+\begin{itemize}
+    \item Planificación basada en localidad de datos
+    \item Priorización por tipo de tarea o criticidad
+    \item Algoritmos de backfill para optimizar utilización
+\end{itemize}
+
+\subsection{Implementación del Nodo Maestro}
+
+\subsubsection{Arquitectura del Maestro (Java)}
+
+El nodo maestro está implementado en Java con una arquitectura multihilo que maneja:
+
+\begin{verbatim}
+public class Main {
+    // Estado compartido thread-safe
+    private static final ConcurrentHashMap<String, Worker> workers;
+    private static final ConcurrentHashMap<String, JobCtx> jobs;
+    private static final BlockingQueue<Task> pendingTasks;
+    
+    public static void main(String[] args) {
+        // Servidor HTTP para clientes
+        HttpServer httpServer = HttpServer.create(8080);
+        httpServer.createContext("/api/jobs", new JobsApi(jobs, scheduler));
+        
+        // Servidor gRPC para trabajadores
+        Server grpcServer = ServerBuilder.forPort(50051)
+            .addService(new MasterService(workers, jobs, pending, scheduler))
+            .build();
+        
+        // Infraestructura de soporte
+        MqttClientManager mqtt = new MqttClientManager();
+        RedisStore redis = RedisStore.fromEnvOrNull();
+    }
+}
+\end{verbatim}
+
+\subsubsection{Gestión de Estado}
+
+\textbf{JobCtx - Contexto de Trabajo:}
+\begin{verbatim}
+public class JobCtx {
+    public JobSpec spec;           // Especificación original
+    public JobState state;         // PENDING, RUNNING, SUCCEEDED, FAILED
+    public int mapsCompleted;      // Contadores de progreso
+    public int reducesCompleted;
+    public byte[] mapScript;       // Scripts compilados
+    public byte[] reduceScript;
+    public Map<Integer, List<String>> partitions; // Datos de shuffle
+    public List<String> finalOutputs; // Resultados consolidados
+}
+\end{verbatim}
+
+\textbf{Proceso de Shuffle:}
+\begin{verbatim}
+private void performShuffle(String jobId) {
+    JobCtx ctx = jobs.get(jobId);
+    Map<Integer, List<String>> partitions = new HashMap<>();
+    
+    // Inicializar particiones
+    for (int i = 0; i < ctx.spec.reducers; i++) {
+        partitions.put(i, new ArrayList<>());
+    }
+    
+    // Agrupar por hash de clave
+    for (String kvLine : ctx.allMapOutputs) {
+        String[] parts = kvLine.split("\t", 2);
+        String key = parts[0];
+        int partitionId = Math.abs(key.hashCode()) % ctx.spec.reducers;
+        partitions.get(partitionId).add(kvLine);
+    }
+    
+    // Crear tareas REDUCE
+    for (int i = 0; i < ctx.spec.reducers; i++) {
+        Task reduceTask = new Task(REDUCE, jobId, i, partitions.get(i));
+        pendingTasks.offer(reduceTask);
+    }
+}
+\end{verbatim}
+
+\subsection{Implementación de Nodos Trabajadores}
+
+\subsubsection{Arquitectura del Trabajador (C++)}
+
+Los trabajadores están implementados en C++20 para maximizar rendimiento:
+
+\begin{verbatim}
+class Worker {
+private:
+    std::string master_url;
+    std::string worker_id;
+    std::unique_ptr<telemetry::MqttClientManager> mqtt;
+    
+public:
+    int run() {
+        registerSelf();        // Registro inicial con maestro
+        startHeartbeat();      // Hilo de heartbeat MQTT
+        
+        while (true) {
+            // Polling por tareas
+            std::string task = http_get(master + "/api/tasks/next?workerId=" 
+                                      + worker_id);
+            if (!task.empty()) {
+                std::string type = get_json_str(task, "type");
+                if (type == "MAP") handleMap(task);
+                else if (type == "REDUCE") handleReduce(task);
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(800));
+        }
+    }
+};
+\end{verbatim}
+
+\subsubsection{Ejecución de Tareas Map}
+
+\begin{verbatim}
+void Worker::handleMap(const std::string &taskJson) {
+    // Extraer metadatos de tarea
+    std::string taskId = get_json_str(taskJson, "task_id");
+    std::string jobId = get_json_str(taskJson, "job_id");
+    std::string chunk = get_json_str(taskJson, "input_chunk");
+    std::string mapUrl = get_json_str(taskJson, "map_url");
+    
+    // Descargar script y preparar entrada
+    save_file("map.py", http_get(master + mapUrl));
+    save_file("input.txt", chunk);
+    
+    // Ejecutar mapper
+    sh("python3 map.py input.txt > map.out");
+    std::string kv_output = sh("cat map.out");
+    
+    // Enviar resultados al maestro
+    sendMapCompletion(taskId, jobId, kv_output);
+}
+\end{verbatim}
+
+\subsubsection{Ejecución de Tareas Reduce}
+
+\begin{verbatim}
+void Worker::handleReduce(const std::string &taskJson) {
+    // Extraer datos de partición
+    std::string taskId = get_json_str(taskJson, "task_id");
+    std::string jobId = get_json_str(taskJson, "job_id");
+    std::string kvLines = get_json_str(taskJson, "kv_lines");
+    std::string reduceUrl = get_json_str(taskJson, "reduce_url");
+    
+    // Preparar reducer
+    save_file("reduce.py", http_get(master + reduceUrl));
+    save_file("reduce_in.txt", kvLines);
+    
+    // Ejecutar reducer
+    sh("python3 reduce.py reduce_in.txt > reduce.out");
+    std::string final_output = sh("cat reduce.out");
+    
+    // Enviar resultado final al maestro
+    sendReduceCompletion(taskId, jobId, final_output);
+}
+\end{verbatim}
+
+\subsection{Tolerancia a Fallos}
+
+\subsubsection{Persistencia en Redis}
+
+El sistema utiliza Redis para mantener estado crítico:
+
+\begin{verbatim}
+public class RedisStore {
+    public void saveJobSpec(JobSpec spec) {
+        jedis.set("gridmr:jobs:" + spec.job_id + ":spec", 
+                 GSON.toJson(spec));
+    }
+    
+    public void saveJobCounters(String jobId, int maps, int reduces) {
+        String key = "gridmr:jobs:" + jobId + ":counters";
+        jedis.hset(key, Map.of(
+            "maps_completed", String.valueOf(maps),
+            "reduces_completed", String.valueOf(reduces)
+        ));
+    }
+    
+    public void setJobState(String jobId, String state) {
+        jedis.set("gridmr:jobs:" + jobId + ":state", state);
+    }
+}
+\end{verbatim}
+
+\subsubsection{Mecanismos de Recuperación}
+
+\begin{itemize}
+    \item \textbf{Heartbeat de trabajadores:} Detección de fallos en 30 segundos
+    \item \textbf{Re-encolamiento de tareas:} Tareas de trabajadores caídos regresan a cola
+    \item \textbf{Checkpointing incremental:} Estado guardado tras cada fase completada
+    \item \textbf{Reinicio desde checkpoint:} Continuación automática tras reinicio de maestro
+\end{itemize}
+
+\subsection{Optimizaciones de Rendimiento}
+
+\subsubsection{Comunicación Eficiente}
+
+\begin{itemize}
+    \item \textbf{gRPC:} Serialización binaria reduce overhead de comunicación
+    \item \textbf{Conexiones persistentes:} Reutilización de conexiones HTTP/gRPC
+    \item \textbf{Compresión:} Compresión automática de payloads grandes
+    \item \textbf{Multiplexación:} HTTP/2 permite múltiples requests concurrentes
+\end{itemize}
+
+\subsubsection{Gestión de Memoria}
+
+\begin{itemize}
+    \item \textbf{Streaming de datos:} Procesamiento incremental sin cargar todo en memoria
+    \item \textbf{RAII en C++:} Gestión automática de recursos en trabajadores
+    \item \textbf{Pool de threads:} Reutilización de threads para reducir overhead
+    \item \textbf{Lazy loading:} Carga de scripts solo cuando son necesarios
+\end{itemize}

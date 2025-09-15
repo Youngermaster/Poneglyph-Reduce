@@ -4,13 +4,13 @@ services:
     container_name: road-poneglyph
     ports:
       - "8080:8080"
+      - "50051:50051"
     environment:
-      # MQTT (EMQX)
       - MQTT_BROKER=tcp://mqtt:1883
       - MQTT_USERNAME=admin
       - MQTT_PASSWORD=public
-      # Redis
       - REDIS_URL=redis://redis:6379
+      - GRPC_PORT=50051
     depends_on:
       - mqtt
       - redis
