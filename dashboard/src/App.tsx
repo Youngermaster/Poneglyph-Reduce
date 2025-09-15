@@ -31,7 +31,7 @@ function App() {
               Poneglyph MapReduce Dashboard
             </h1>
             <p className="text-muted-foreground">
-              Real-time monitoring of your distributed MapReduce cluster
+              Real-time monitoring for distributed MapReduce cluster
             </p>
           </div>
           <ConnectionStatus isConnected={isConnected} error={error} />
