@@ -7,9 +7,12 @@ import core.Scheduler;
 import core.SmartScheduler;
 import grpc.gRPCUtils;
 import http.HttpUtils;
+import io.grpc.Server;
+import io.grpc.ServerBuilder;
 import model.JobCtx;
 import model.Task;
 import model.Worker;
+import rpc.MasterService;
 import store.RedisStore;
 import telemetry.MqttClientManager;
 
@@ -33,6 +36,7 @@ public class Main {
         // Inicializar SmartScheduler
         smartScheduler = new SmartScheduler(pendingTasks, workers, mqtt);
 
+        // ---- HTTP ----
         int port = 8080;
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
 
@@ -66,17 +70,40 @@ public class Main {
             }
             HttpUtils.respondJson(ex, 200, smartScheduler.getSchedulerStats());
         });
-
+        
         server.start();
-        System.out.println("Road-Poneglyph Master listening on :8080");
+        System.out.println("Road-Poneglyph HTTP listening on :8080");
 
-        // optional gRPC bootstrap
-        gRPCUtils.main(args);
+        // ---- gRPC ----
+        int grpcPort = Integer.parseInt(System.getenv().getOrDefault("GRPC_PORT", "50051"));
+        Server grpcServer = ServerBuilder.forPort(grpcPort)
+                .addService(new MasterService(
+                        (ConcurrentMap<String, Worker>) workers,
+                        (ConcurrentMap<String, JobCtx>) jobs,
+                        pendingTasks,
+                        scheduler,
+                        mqtt,
+                        redis))
+                .build()
+                .start();
+        System.out.println("Road-Poneglyph gRPC listening on :" + grpcPort);
 
         // Graceful shutdown
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            try { if (mqtt != null) mqtt.close(); } catch (Exception ignored) {}
-            try { if (redis != null) redis.close(); } catch (Exception ignored) {}
+            try {
+                grpcServer.shutdown();
+            } catch (Exception ignored) {
+            }
+            try {
+                if (mqtt != null) mqtt.close();
+            } catch (Exception ignored) {
+            }
+            try {
+                if (redis != null) redis.close();
+            } catch (Exception ignored) {
+            }
         }));
+
+        grpcServer.awaitTermination(); // block process
     }
 }

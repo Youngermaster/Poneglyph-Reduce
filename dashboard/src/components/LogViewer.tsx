@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { MqttMessage } from "../types/mqtt";
+import type { MqttMessage } from "@/types/mqtt";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertCircle, CheckCircle, Info, Shuffle } from "lucide-react";
 

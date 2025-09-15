@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from "react";
+import React, { useMemo, useCallback, useRef } from "react";
 import {
   ReactFlow,
   Background,
@@ -9,17 +9,20 @@ import {
   addEdge,
   ConnectionMode,
 } from "reactflow";
-import type { Node, Edge, Connection } from "reactflow";
+import type { Node, Edge, Connection, ReactFlowInstance } from "reactflow";
 import "reactflow/dist/style.css";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { JobProgress } from "../types/mqtt";
+import type { JobProgress } from "@/types/mqtt";
 
 interface MapReduceFlowProps {
   jobs: Map<string, JobProgress>;
 }
 
 export const MapReduceFlow = ({ jobs }: MapReduceFlowProps) => {
+  const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
+  const fitViewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
     const nodes: Node[] = [
       {
@@ -192,6 +195,31 @@ export const MapReduceFlow = ({ jobs }: MapReduceFlowProps) => {
   React.useEffect(() => {
     setNodes(initialNodes);
     setEdges(initialEdges);
+
+    // Auto-fit view when nodes change (debounced to prevent excessive calls)
+    if (reactFlowInstance.current && initialNodes.length > 1) {
+      // Clear any existing timeout
+      if (fitViewTimeoutRef.current) {
+        clearTimeout(fitViewTimeoutRef.current);
+      }
+
+      // Set new timeout for fitView
+      fitViewTimeoutRef.current = setTimeout(() => {
+        reactFlowInstance.current?.fitView({
+          padding: 0.1,
+          includeHiddenNodes: false,
+          minZoom: 0.1,
+          maxZoom: 1.5,
+        });
+      }, 150);
+    }
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (fitViewTimeoutRef.current) {
+        clearTimeout(fitViewTimeoutRef.current);
+      }
+    };
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   return (
@@ -208,6 +236,9 @@ export const MapReduceFlow = ({ jobs }: MapReduceFlowProps) => {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             connectionMode={ConnectionMode.Loose}
+            onInit={(instance) => {
+              reactFlowInstance.current = instance;
+            }}
             fitView
             attributionPosition="bottom-left"
           >
