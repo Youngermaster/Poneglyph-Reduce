@@ -1,0 +1,267 @@
+% -----------------------------------------------------------------
+% 4. Protocolos de Comunicación y APIs
+% -----------------------------------------------------------------
+\section{Protocolos de Comunicación}
+
+\subsection{Protocolo Cliente-Maestro (HTTP/REST)}
+
+La comunicación entre cliente y maestro se basa en una API REST que proporciona endpoints claros para la gestión de trabajos MapReduce.
+
+\subsubsection{Endpoints Principales}
+
+\textbf{Envío de Trabajos:}
+\begin{verbatim}
+POST /api/jobs
+Content-Type: application/json
+
+{
+  "job_id": "wordcount-001",
+  "input_text": "datos de entrada...",
+  "split_size": 64,
+  "reducers": 2,
+  "format": "text",
+  "map_script_b64": "cHl0aG9uIGNvZGU...",
+  "reduce_script_b64": "cHl0aG9uIGNvZGU..."
+}
+\end{verbatim}
+
+\textbf{Consulta de Estado:}
+\begin{verbatim}
+GET /api/jobs/status?job_id=wordcount-001
+
+Response:
+{
+  "state": "RUNNING",
+  "maps_completed": 5,
+  "maps_total": 10,
+  "reduces_completed": 0,
+  "reduces_total": 2
+}
+\end{verbatim}
+
+\textbf{Recuperación de Resultados:}
+\begin{verbatim}
+GET /api/jobs/result?job_id=wordcount-001
+
+Response: (texto plano con resultados finales)
+one    100
+fish   400
+red    100
+blue   100
+\end{verbatim}
+
+\subsubsection{Flujo de Comunicación Cliente-Maestro}
+
+\begin{enumerate}
+    \item \textbf{Envío de trabajo:} Cliente codifica scripts en Base64 y envía especificación completa
+    \item \textbf{Confirmación:} Maestro valida entrada y retorna ID de trabajo confirmado
+    \item \textbf{Polling de estado:} Cliente consulta periódicamente progreso del trabajo
+    \item \textbf{Finalización:} Una vez completado (SUCCEEDED/FAILED), cliente recupera resultados
+\end{enumerate}
+
+\subsection{Protocolo Maestro-Trabajadores (gRPC)}
+
+La comunicación entre maestro y trabajadores utiliza gRPC con Protocol Buffers para máxima eficiencia en tareas computacionalmente intensivas.
+
+\subsubsection{Definición del Servicio}
+
+\begin{verbatim}
+service Master {
+  rpc Register      (WorkerRegisterRequest) returns (WorkerRegisterResponse);
+  rpc NextTask      (NextTaskRequest)       returns (TaskAssignment);
+  rpc CompleteMap   (CompleteMapRequest)    returns (Ack);
+  rpc CompleteReduce(CompleteReduceRequest) returns (Ack);
+}
+\end{verbatim}
+
+\subsubsection{Registro de Trabajadores}
+
+\textbf{Mensaje de Registro:}
+\begin{verbatim}
+message WorkerRegisterRequest {
+  string name = 1;        // Identificador descriptivo
+  int32 capacity = 2;     // Capacidad de procesamiento
+}
+
+message WorkerRegisterResponse {
+  string worker_id = 1;           // ID único asignado
+  int32 poll_interval_ms = 2;     // Intervalo de polling sugerido
+}
+\end{verbatim}
+
+\subsubsection{Asignación de Tareas}
+
+\textbf{Solicitud de Tarea:}
+\begin{verbatim}
+message NextTaskRequest { 
+  string worker_id = 1; 
+}
+\end{verbatim}
+
+\textbf{Asignación de Tarea Map:}
+\begin{verbatim}
+message MapTask {
+  string task_id = 1;      // Identificador único de tarea
+  string job_id = 2;       // Trabajo al que pertenece
+  string input_chunk = 3;  // Fragmento de datos a procesar
+  string map_url = 4;      // URL de script (fallback HTTP)
+  int32 reducers = 5;      // Número de reducers para particionamiento
+  bytes map_script = 6;    // Script embebido (opcional)
+}
+\end{verbatim}
+
+\textbf{Asignación de Tarea Reduce:}
+\begin{verbatim}
+message ReduceTask {
+  string task_id = 1;         // Identificador único de tarea
+  string job_id = 2;          // Trabajo al que pertenece
+  int32 partition_index = 3;  // Índice de partición a reducir
+  string reduce_url = 4;      // URL de script (fallback HTTP)
+  string kv_lines = 5;        // Pares clave-valor agrupados
+  bytes reduce_script = 6;    // Script embebido (opcional)
+}
+\end{verbatim}
+
+\subsubsection{Finalización de Tareas}
+
+\textbf{Finalización de Tarea Map:}
+\begin{verbatim}
+message CompleteMapRequest {
+  string worker_id = 1;  // ID del trabajador
+  string task_id = 2;    // ID de tarea completada
+  string job_id = 3;     // ID del trabajo
+  string kv_lines = 4;   // Pares clave-valor resultantes
+}
+\end{verbatim}
+
+\textbf{Finalización de Tarea Reduce:}
+\begin{verbatim}
+message CompleteReduceRequest {
+  string worker_id = 1;  // ID del trabajador
+  string task_id = 2;    // ID de tarea completada
+  string job_id = 3;     // ID del trabajo
+  string output = 4;     // Salida final reducida
+}
+\end{verbatim}
+
+\subsection{Protocolo de Telemetría (MQTT)}
+
+El sistema utiliza MQTT para telemetría en tiempo real, proporcionando visibilidad completa del estado del sistema.
+
+\subsubsection{Tópicos de Trabajos}
+
+\textbf{Creación de Trabajo:}
+\begin{verbatim}
+Tópico: gridmr/job/created
+Payload: {
+  "splitSize": 64,
+  "jobId": "wordcount-001",
+  "reducers": 2,
+  "ts": 1757877465134,
+  "maps": 134
+}
+\end{verbatim}
+
+\textbf{Finalización de Tarea Map:}
+\begin{verbatim}
+Tópico: gridmr/job/{jobId}/map/completed
+Payload: {
+  "mapsCompleted": 1,
+  "ts": 1757877465158,
+  "taskId": "map-0",
+  "added": 12
+}
+\end{verbatim}
+
+\textbf{Finalización de Tarea Reduce:}
+\begin{verbatim}
+Tópico: gridmr/job/{jobId}/reduce/completed
+Payload: {
+  "ts": 1757877467754,
+  "taskId": "reduce-0",
+  "reducesCompleted": 1
+}
+\end{verbatim}
+
+\textbf{Proceso de Shuffle:}
+\begin{verbatim}
+Tópico: gridmr/job/{jobId}/shuffle/partitions
+Payload: {
+  "sizes": [1400, 200],
+  "ts": 1757877467735
+}
+\end{verbatim}
+
+\textbf{Estado del Trabajo:}
+\begin{verbatim}
+Tópico: gridmr/job/{jobId}/state
+Payload: {
+  "ts": 1757877467772,
+  "state": "SUCCEEDED"
+}
+\end{verbatim}
+
+\subsubsection{Tópicos de Trabajadores}
+
+\textbf{Registro de Trabajador:}
+\begin{verbatim}
+Tópico: gridmr/worker/registered
+Payload: {
+  "workerId": "worker-abc123",
+  "name": "ohara-scribe",
+  "capacity": 1,
+  "ts": 1757877465000
+}
+\end{verbatim}
+
+\textbf{Heartbeat de Trabajador:}
+\begin{verbatim}
+Tópico: gridmr/worker/{workerId}/heartbeat
+Payload: {
+  "ts": 1757877465000
+}
+\end{verbatim}
+
+\subsection{Gestión de Datos}
+
+El sistema implementa un modelo híbrido de gestión de datos que combina transferencia directa con persistencia distribuida.
+
+\subsubsection{Modo de Transferencia (Implementado)}
+
+\textbf{Para tareas Map:}
+\begin{enumerate}
+    \item Maestro envía fragmento de datos directamente en mensaje gRPC
+    \item Trabajador recibe chunk y script de procesamiento
+    \item Trabajador ejecuta mapper localmente sobre el fragmento
+    \item Resultados intermedios se envían de vuelta al maestro
+\end{enumerate}
+
+\textbf{Para tareas Reduce:}
+\begin{enumerate}
+    \item Maestro agrupa pares clave-valor por partición
+    \item Datos agrupados se envían directamente en mensaje gRPC
+    \item Trabajador ejecuta reducer sobre datos agrupados
+    \item Resultado final se envía al maestro para consolidación
+\end{enumerate}
+
+\subsubsection{Modo GridFS (Futuro)}
+
+Para volúmenes de datos mayores, el sistema está diseñado para soportar un modelo basado en almacenamiento distribuido:
+
+\begin{itemize}
+    \item \textbf{Map-modo2:} Trabajadores acceden a datos vía API GridFS
+    \item \textbf{Reduce-modo2:} Resultados se almacenan en sistema distribuido
+    \item \textbf{Localidad de datos:} Principio de mover cómputo cerca de los datos
+    \item \textbf{Escalabilidad:} Soporte para datasets que exceden memoria individual
+\end{itemize}
+
+\subsection{Seguridad y Autenticación}
+
+El sistema actual implementa seguridad básica con capacidad de extensión:
+
+\begin{itemize}
+    \item \textbf{Identificación de trabajadores:} IDs únicos asignados por maestro
+    \item \textbf{Validación de tareas:} Verificación de job\_id y task\_id
+    \item \textbf{Credenciales MQTT:} Autenticación básica (admin/public)
+    \item \textbf{Extensibilidad:} Arquitectura preparada para tokens JWT y encriptación TLS
+\end{itemize}
