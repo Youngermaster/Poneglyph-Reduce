@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import mqtt from "mqtt";
 import type { MqttClient } from "mqtt";
-import type { MqttMessage, JobProgress, WorkerNode } from "../types/mqtt";
+import type { MqttMessage, JobProgress, WorkerNode } from "@/types/mqtt";
 
 interface UseMqttReturn {
   isConnected: boolean;
