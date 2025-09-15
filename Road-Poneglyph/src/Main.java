@@ -81,7 +81,7 @@ public class Main {
                         (ConcurrentMap<String, Worker>) workers,
                         (ConcurrentMap<String, JobCtx>) jobs,
                         pendingTasks,
-                        scheduler,
+                        smartScheduler,
                         mqtt,
                         redis))
                 .build()
