@@ -1,8 +1,10 @@
 #pragma once
+#include <grpcpp/grpcpp.h>
+
+#include <iostream>
 #include <memory>
 #include <string>
-#include <iostream>
-#include <grpcpp/grpcpp.h>
+
 #include "gridmr.grpc.pb.h"
 
 class MasterGrpcClient {
@@ -20,7 +22,8 @@ public:
         grpc::ClientContext ctx;
         auto status = stub_->Register(&ctx, req, &resp);
         if (!status.ok()) {
-            std::cerr << "[gRPC] Register failed: " << status.error_code() << " - " << status.error_message() << std::endl;
+            std::cerr << "[gRPC] Register failed: " << status.error_code() << " - " << status.error_message() <<
+                    std::endl;
             return false;
         }
         out_worker_id = resp.worker_id();

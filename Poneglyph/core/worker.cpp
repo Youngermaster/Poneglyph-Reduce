@@ -1,14 +1,15 @@
 #include "model/worker.hpp"
-#include "model/http.hpp"
-#include "model/json.hpp"
-#include "telemetry/mqtt.hpp"
-#include "gridmr.grpc.pb.h"
-#include "rpc/grpc_client.hpp"
 
 #include <chrono>
 #include <iostream>
 #include <sstream>
 #include <thread>
+
+#include "gridmr.grpc.pb.h"
+#include "model/http.hpp"
+#include "model/json.hpp"
+#include "rpc/grpc_client.hpp"
+#include "telemetry/mqtt.hpp"
 
 Worker::Worker(std::string masterUrl,
                std::unique_ptr<telemetry::MqttClientManager> mqttClient,
@@ -28,7 +29,7 @@ void Worker::registerSelf() {
     if (grpc) {
         std::string wid;
         int poll_ms = 1000;
-        bool ok = grpc->RegisterWorker("poneglyph-worker", /*capacity*/2, wid, &poll_ms);
+        bool ok = grpc->RegisterWorker("poneglyph-worker", /*capacity*/ 2, wid, &poll_ms);
         if (ok && !wid.empty()) {
             workerId = wid;
             std::cout << "[gRPC] Registered as " << workerId << " (poll=" << poll_ms << "ms)\n";
@@ -127,10 +128,14 @@ void Worker::handleMap(const std::string &taskJson) {
             << "\"type\":\"MAP\","
             << "\"kv_lines\":\"";
     for (char c: kv) {
-        if (c == '\\' || c == '\"') payload << '\\' << c;
-        else if (c == '\n') payload << "\\n";
-        else if (c == '\t') payload << "\\t";
-        else payload << c;
+        if (c == '\\' || c == '\"')
+            payload << '\\' << c;
+        else if (c == '\n')
+            payload << "\\n";
+        else if (c == '\t')
+            payload << "\\t";
+        else
+            payload << c;
     }
     payload << "\"}";
     http_post_json(master + "/api/tasks/complete", payload.str());
@@ -168,10 +173,14 @@ void Worker::handleReduce(const std::string &taskJson) {
             << "\"type\":\"REDUCE\","
             << "\"output\":\"";
     for (char c: out) {
-        if (c == '\\' || c == '\"') payload << '\\' << c;
-        else if (c == '\n') payload << "\\n";
-        else if (c == '\t') payload << "\\t";
-        else payload << c;
+        if (c == '\\' || c == '\"')
+            payload << '\\' << c;
+        else if (c == '\n')
+            payload << "\\n";
+        else if (c == '\t')
+            payload << "\\t";
+        else
+            payload << c;
     }
     payload << "\"}";
     http_post_json(master + "/api/tasks/complete", payload.str());
@@ -203,9 +212,12 @@ int Worker::run() {
                 std::this_thread::sleep_for(std::chrono::milliseconds(800));
                 continue;
             }
-            if (ta.has_map()) handleMapGrpc(ta.map());
-            else if (ta.has_reduce()) handleReduceGrpc(ta.reduce());
-            else std::this_thread::sleep_for(std::chrono::milliseconds(300));
+            if (ta.has_map())
+                handleMapGrpc(ta.map());
+            else if (ta.has_reduce())
+                handleReduceGrpc(ta.reduce());
+            else
+                std::this_thread::sleep_for(std::chrono::milliseconds(300));
             continue;
         }
 
@@ -216,12 +228,14 @@ int Worker::run() {
             continue;
         }
         std::string type = get_json_str(task, "type");
-        if (type == "MAP") handleMap(task);
-        else if (type == "REDUCE") handleReduce(task);
-        else std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        if (type == "MAP")
+            handleMap(task);
+        else if (type == "REDUCE")
+            handleReduce(task);
+        else
+            std::this_thread::sleep_for(std::chrono::milliseconds(300));
     }
 }
-
 
 void Worker::handleMapGrpc(const gridmr::MapTask &mt) {
     // Map script: prefer embedded; else fetch via HTTP fallback URL
@@ -252,10 +266,14 @@ void Worker::handleMapGrpc(const gridmr::MapTask &mt) {
                 << "\"type\":\"MAP\","
                 << "\"kv_lines\":\"";
         for (char c: kv) {
-            if (c == '\\' || c == '\"') payload << '\\' << c;
-            else if (c == '\n') payload << "\\n";
-            else if (c == '\t') payload << "\\t";
-            else payload << c;
+            if (c == '\\' || c == '\"')
+                payload << '\\' << c;
+            else if (c == '\n')
+                payload << "\\n";
+            else if (c == '\t')
+                payload << "\\t";
+            else
+                payload << c;
         }
         payload << "\"}";
         http_post_json(master + "/api/tasks/complete", payload.str());
@@ -294,10 +312,14 @@ void Worker::handleReduceGrpc(const gridmr::ReduceTask &rt) {
                 << "\"type\":\"REDUCE\","
                 << "\"output\":\"";
         for (char c: out) {
-            if (c == '\\' || c == '\"') payload << '\\' << c;
-            else if (c == '\n') payload << "\\n";
-            else if (c == '\t') payload << "\\t";
-            else payload << c;
+            if (c == '\\' || c == '\"')
+                payload << '\\' << c;
+            else if (c == '\n')
+                payload << "\\n";
+            else if (c == '\t')
+                payload << "\\t";
+            else
+                payload << c;
         }
         payload << "\"}";
         http_post_json(master + "/api/tasks/complete", payload.str());
