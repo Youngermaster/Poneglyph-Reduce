@@ -11,6 +11,12 @@ services:
       - MQTT_PASSWORD=public
       - REDIS_URL=redis://redis:6379
       - GRPC_PORT=50051
+      # AWS S3 Configuration (uncomment and configure for S3 storage)
+      # - AWS_S3_BUCKET=your-mapreduce-results-bucket
+      # - AWS_S3_BASE_PATH=mapreduce-results/
+      # - AWS_REGION=us-east-1
+      # - AWS_ACCESS_KEY_ID=your-access-key-id
+      # - AWS_SECRET_ACCESS_KEY=your-secret-access-key
     depends_on:
       - mqtt
       - redis

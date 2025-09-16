@@ -3,6 +3,7 @@ package core;
 import model.JobCtx;
 import model.Task;
 import model.TaskType;
+// import utils.S3Utils;
 
 import java.nio.charset.StandardCharsets;
 import java.io.File;
@@ -70,6 +71,7 @@ public class Scheduler {
      */
     public static void persistResult(JobCtx ctx) {
         try {
+            // Store locally (existing functionality)
             File dir = new File("out");
             if (!dir.exists()) dir.mkdirs();
             File f = new File(dir, ctx.spec.job_id + ".txt");
@@ -77,8 +79,62 @@ public class Scheduler {
                 fos.write(ctx.finalOutput.getBytes(StandardCharsets.UTF_8));
             }
             System.out.println("[RESULT STORED] " + f.getAbsolutePath());
+
+            // Store in AWS S3 (commented out for testing)
+            // storeResultInS3(ctx);
+
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
+
+    /**
+     * Store job result in AWS S3 using S3Utils.
+     * This method is commented out for testing but ready to use.
+     */
+    /* 
+    private static void storeResultInS3(JobCtx ctx) {
+        try {
+            S3Utils s3Utils = S3Utils.fromEnvironment();
+            if (s3Utils == null) {
+                System.out.println("[S3] S3 storage not configured - skipping S3 upload");
+                return;
+            }
+            
+            // Check if bucket is accessible before attempting upload
+            if (!s3Utils.isBucketAccessible()) {
+                System.err.println("[S3] Bucket not accessible - skipping S3 upload");
+                return;
+            }
+            
+            // Prepare metadata for the job result
+            Map<String, String> metadata = new HashMap<>();
+            metadata.put("job-type", "mapreduce");
+            metadata.put("maps-completed", String.valueOf(ctx.completedMaps));
+            metadata.put("reduces-completed", String.valueOf(ctx.completedReduces));
+            metadata.put("final-output-size", String.valueOf(ctx.finalOutput.length()));
+            
+            // Store the result in S3
+            String s3Key = s3Utils.storeJobResultWithMetadata(
+                ctx.spec.job_id, 
+                ctx.finalOutput, 
+                metadata
+            );
+            
+            System.out.println("[S3] Job result stored at: " + s3Key);
+            
+            // Optionally generate a presigned URL for temporary access (24 hours)
+            String presignedUrl = s3Utils.generatePresignedUrl(s3Key, 24 * 60);
+            if (presignedUrl != null) {
+                System.out.println("[S3] Temporary access URL (24h): " + presignedUrl);
+            }
+            
+            s3Utils.close();
+            
+        } catch (Exception e) {
+            System.err.println("[S3 ERROR] Failed to store result in S3: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    */
 }
