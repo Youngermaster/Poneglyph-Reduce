@@ -211,16 +211,40 @@ public class SmartScheduler extends Scheduler {
         int totalActiveTasks = workers.values().stream().mapToInt(w -> w.activeTasks).sum();
         int totalCapacity = workers.values().stream().mapToInt(w -> w.capacity).sum();
 
-        return Map.of(
-                "healthyWorkers", healthyWorkers,
-                "totalWorkers", workers.size(),
-                "totalActiveTasks", totalActiveTasks,
-                "totalCapacity", totalCapacity,
-                "queueSizes", Map.of(
-                        "map", mapTasks.size(),
-                        "reduce", reduceTasks.size()
-                ),
-                "avgWorkerLoad", totalCapacity > 0 ? (double) totalActiveTasks / totalCapacity : 0.0
-        );
+        // Crear información detallada de cada worker
+        List<Map<String, Object>> workerDetails = new ArrayList<>();
+        for (Map.Entry<String, Worker> entry : workers.entrySet()) {
+            Worker worker = entry.getValue();
+            Map<String, Object> workerInfo = new HashMap<>();
+            workerInfo.put("id", entry.getKey());
+            workerInfo.put("name", worker.name != null ? worker.name : entry.getKey());
+            workerInfo.put("isHealthy", worker.isHealthy());
+            workerInfo.put("activeTasks", worker.activeTasks);
+            workerInfo.put("capacity", worker.capacity);
+            workerInfo.put("completedTasks", worker.completedTasks);
+            workerInfo.put("loadPercentage", worker.capacity > 0 ? (double) worker.activeTasks / worker.capacity * 100 : 0.0);
+            workerInfo.put("loadScore", worker.getLoadScore());
+            workerInfo.put("avgTaskTime", worker.avgTaskTimeMs);
+            workerInfo.put("cpuUsage", worker.cpuUsage * 100);
+            workerInfo.put("memoryUsage", worker.memoryUsage * 100);
+            workerInfo.put("lastHeartbeat", worker.lastHeartbeat);
+            workerInfo.put("status", worker.isHealthy() ? "HEALTHY" : "UNHEALTHY");
+            workerDetails.add(workerInfo);
+        }
+
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("healthyWorkers", healthyWorkers);
+        stats.put("totalWorkers", workers.size());
+        stats.put("totalActiveTasks", totalActiveTasks);
+        stats.put("totalCapacity", totalCapacity);
+        stats.put("queueSizes", Map.of(
+                "map", mapTasks.size(),
+                "reduce", reduceTasks.size()
+        ));
+        stats.put("avgWorkerLoad", totalCapacity > 0 ? (double) totalActiveTasks / totalCapacity * 100 : 0.0);
+        stats.put("workers", workerDetails);
+        stats.put("algorithm", "Smart Scheduler (Hybrid: 50% Load + 30% Resources + 20% Performance)");
+        
+        return stats;
     }
 }
