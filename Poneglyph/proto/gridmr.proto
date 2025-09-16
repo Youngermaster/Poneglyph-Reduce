@@ -32,7 +32,7 @@ message ReduceTask {
 
 message TaskAssignment {
   bool has_task = 1;
-  oneof task { MapTask map = 2; ReduceTask reduce = 3; }
+  oneof payload { MapTask map = 2; ReduceTask reduce = 3; }
 }
 
 // ---- Completion ----
