@@ -1,15 +1,18 @@
 import "./App.css";
 import { useMqtt } from "./hooks/useMqtt";
+import { useScheduler } from "./hooks/useScheduler";
 import { ConnectionStatus } from "./components/ConnectionStatus";
 import { JobCard } from "./components/JobCard";
 import { LogViewer } from "./components/LogViewer";
 import { MapReduceFlow } from "./components/MapReduceFlow";
+import { SmartSchedulerView } from "./components/SmartSchedulerView";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, BarChart3, FileText, Workflow } from "lucide-react";
 
 function App() {
   const { isConnected, jobs, recentMessages, error } = useMqtt();
+  const { schedulerStats, isLoading: schedulerLoading, error: schedulerError, lastUpdate } = useScheduler();
 
   const activeJobs = Array.from(jobs.values()).filter(
     (job) => job.state === "RUNNING"
@@ -96,6 +99,9 @@ function App() {
             <TabsTrigger value="overview" className="text-white">
               Overview
             </TabsTrigger>
+            <TabsTrigger value="scheduler" className="text-white">
+              Smart Scheduler
+            </TabsTrigger>
             <TabsTrigger value="flow" className="text-white">
               Flow Visualization
             </TabsTrigger>
@@ -123,6 +129,15 @@ function App() {
                 </Card>
               )}
             </div>
+          </TabsContent>
+
+          <TabsContent value="scheduler">
+            <SmartSchedulerView 
+              schedulerStats={schedulerStats}
+              isLoading={schedulerLoading}
+              error={schedulerError}
+              lastUpdate={lastUpdate}
+            />
           </TabsContent>
 
           <TabsContent value="flow">
