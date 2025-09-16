@@ -196,22 +196,29 @@ public class S3Utils {
      */
     public String generatePresignedUrl(String objectKey, int durationMinutes) {
         try {
+            // Create an S3Presigner using the default region and credentials
+            software.amazon.awssdk.services.s3.presigner.S3Presigner presigner =
+                    software.amazon.awssdk.services.s3.presigner.S3Presigner.create();
+
+            // Create a GetObjectRequest to be pre-signed
             GetObjectRequest getObjectRequest = GetObjectRequest.builder()
                     .bucket(bucketName)
                     .key(objectKey)
                     .build();
 
-            // Create a presigned URL that expires in the specified duration
-            GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
-                    .signatureDuration(java.time.Duration.ofMinutes(durationMinutes))
-                    .getObjectRequest(getObjectRequest)
-                    .build();
+            // Create a GetObjectPresignRequest to specify the signature duration
+            software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest presignRequest =
+                    software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest.builder()
+                            .signatureDuration(java.time.Duration.ofMinutes(durationMinutes))
+                            .getObjectRequest(getObjectRequest)
+                            .build();
 
-            software.amazon.awssdk.services.s3.presigner.S3Presigner presigner =
-                    software.amazon.awssdk.services.s3.presigner.S3Presigner.create();
-
+            // Generate the presigned request
             software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest presignedRequest =
                     presigner.presignGetObject(presignRequest);
+
+            // Close the presigner to free resources
+            presigner.close();
 
             return presignedRequest.url().toString();
 
