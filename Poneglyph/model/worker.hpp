@@ -1,12 +1,19 @@
 #pragma once
 #include <memory>
 #include <string>
+#include <utility>  // for std::pair
 
 namespace telemetry {
     class MqttClientManager;
 }
 
 class MasterGrpcClient; // fwd
+
+// fwd-declare proto messages so we can use them by reference in the header
+namespace gridmr {
+    class MapTask;
+    class ReduceTask;
+}
 
 class Worker {
 public:
