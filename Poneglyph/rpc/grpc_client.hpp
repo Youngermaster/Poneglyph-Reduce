@@ -1,6 +1,7 @@
 #pragma once
 #include <memory>
 #include <string>
+#include <iostream>
 #include <grpcpp/grpcpp.h>
 #include "gridmr.grpc.pb.h"
 
@@ -18,7 +19,10 @@ public:
         gridmr::WorkerRegisterResponse resp;
         grpc::ClientContext ctx;
         auto status = stub_->Register(&ctx, req, &resp);
-        if (!status.ok()) return false;
+        if (!status.ok()) {
+            std::cerr << "[gRPC] Register failed: " << status.error_code() << " - " << status.error_message() << std::endl;
+            return false;
+        }
         out_worker_id = resp.worker_id();
         if (poll_ms) *poll_ms = resp.poll_interval_ms();
         return true;

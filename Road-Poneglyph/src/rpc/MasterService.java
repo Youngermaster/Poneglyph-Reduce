@@ -3,6 +3,7 @@ package rpc;
 import com.google.gson.Gson;
 import gridmr.*;
 import core.Scheduler;
+import core.SmartScheduler;
 import http.HttpUtils;
 import model.*;
 import store.RedisStore;
@@ -61,7 +62,16 @@ public class MasterService extends MasterGrpc.MasterImplBase {
     // ---- NextTask ----
     @Override
     public void nextTask(NextTaskRequest req, StreamObserver<TaskAssignment> respObs) {
-        Task task = pending.poll();
+        String workerId = req.getWorkerId();
+        Task task = null;
+        
+        // Use SmartScheduler if available, otherwise fall back to basic scheduler
+        if (scheduler instanceof SmartScheduler) {
+            task = ((SmartScheduler) scheduler).getNextTaskForWorker(workerId);
+        } else {
+            task = pending.poll();
+        }
+        
         if (task == null) {
             respObs.onNext(TaskAssignment.newBuilder().setHasTask(false).build());
             respObs.onCompleted();
@@ -121,6 +131,11 @@ public class MasterService extends MasterGrpc.MasterImplBase {
         }
         ctx.completedMaps++;
         System.out.println("[MAP COMPLETE gRPC] job=" + jobId + " task=" + req.getTaskId() + " kvAdded=" + added);
+        
+        // Notify SmartScheduler if available
+        if (scheduler instanceof SmartScheduler) {
+            ((SmartScheduler) scheduler).onTaskCompleted(req.getTaskId(), req.getWorkerId());
+        }
 
         if (mqtt != null) {
             mqtt.publishJson("gridmr/job/" + jobId + "/map/completed", Map.of(
@@ -189,6 +204,11 @@ public class MasterService extends MasterGrpc.MasterImplBase {
         String out = req.getOutput();
         ctx.completedReduces++;
         ctx.finalOutput += out + (out.endsWith("\n") ? "" : "\n");
+        
+        // Notify SmartScheduler if available
+        if (scheduler instanceof SmartScheduler) {
+            ((SmartScheduler) scheduler).onTaskCompleted(req.getTaskId(), req.getWorkerId());
+        }
 
         if (mqtt != null) {
             mqtt.publishJson("gridmr/job/" + jobId + "/reduce/completed", Map.of(
