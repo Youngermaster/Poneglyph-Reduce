@@ -322,3 +322,73 @@ tar czf config-backup-$(date +%Y%m%d).tgz docker-compose.yml env/
     \item Preservación de estado durante el proceso
     \item Notificaciones automáticas de estado de actualización
 \end{itemize}
+
+\subsection{Deployment Distribuido con Ansible}
+
+\subsubsection{Infraestructura de Pruebas}
+
+Para validar el sistema en un entorno distribuido real, se implementó un deployment automatizado utilizando Ansible para acondicionar múltiples instancias EC2 de Amazon Web Services.
+
+\textbf{Configuración de la infraestructura:}
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Servicio} & \textbf{IP Pública} & \textbf{Función} \\
+\hline
+Master & 54.87.145.230 & Coordinación y API \\
+Worker 1 & 98.80.119.77 & Procesamiento Map/Reduce \\
+Worker 2 & 34.229.10.170 & Procesamiento Map/Reduce \\
+Worker 3 & 54.235.7.105 & Procesamiento Map/Reduce \\
+Redis & 3.80.110.27 & Almacenamiento de estado \\
+EMQX & 34.235.115.144 & Broker MQTT \\
+Dashboard & 13.221.254.93 & Interfaz web de monitoreo \\
+\hline
+\end{tabular}
+\caption{Infraestructura distribuida de pruebas}
+\label{table:distributed-infrastructure}
+\end{table}
+
+\subsubsection{Automatización con Ansible}
+
+El sistema incluye un playbook de Ansible (\texttt{setup\_ec2.yml}) que automatiza completamente el acondicionamiento de las máquinas EC2:
+
+\textbf{Tareas automatizadas:}
+\begin{enumerate}
+    \item \textbf{Actualización del sistema:} Actualización de paquetes Ubuntu
+    \item \textbf{Instalación de Docker:} Docker CE, Docker Compose y dependencias
+    \item \textbf{Configuración de usuarios:} Agregado de usuario al grupo docker
+    \item \textbf{Clonado del repositorio:} Descarga automática del código fuente
+    \item \textbf{Configuración de permisos:} Establecimiento de permisos correctos
+    \item \textbf{Instalación de dependencias:} Git, Python3, herramientas de desarrollo
+\end{enumerate}
+
+\textbf{Beneficios del deployment automatizado:}
+\begin{itemize}
+    \item \textbf{Reproducibilidad:} Configuración idéntica en todas las máquinas
+    \item \textbf{Escalabilidad:} Fácil adición de nuevos nodos al cluster
+    \item \textbf{Mantenimiento:} Actualizaciones coordenadas de toda la infraestructura
+    \item \textbf{Documentación:} Infraestructura como código (IaC)
+\end{itemize}
+
+\subsubsection{Proceso de Deployment}
+
+\textbf{Comandos de deployment por servicio:}
+\begin{verbatim}
+# En cada máquina respectiva:
+./deploy-master.sh      # 54.87.145.230
+./deploy-worker.sh      # 98.80.119.77, 34.229.10.170, 54.235.7.105
+./deploy-redis.sh       # 3.80.110.27
+./deploy-emqx.sh        # 34.235.115.144
+./deploy-dashboard.sh   # 13.221.254.93
+\end{verbatim}
+
+\textbf{Validación del deployment:}
+\begin{itemize}
+    \item \textbf{Conectividad:} Verificación de comunicación entre servicios
+    \item \textbf{Health checks:} APIs funcionando correctamente
+    \item \textbf{Registro de workers:} Workers conectándose automáticamente al master
+    \item \textbf{Monitoreo:} Dashboard mostrando métricas en tiempo real
+\end{itemize}
+
+Esta infraestructura distribuida permite validar el comportamiento del sistema en condiciones reales de red, con latencias variables y distribución geográfica de los componentes.
