@@ -39,7 +39,7 @@ add_library(gridmr_proto
 target_include_directories(gridmr_proto PUBLIC ${GEN_DIR})
 target_link_libraries(gridmr_proto PUBLIC protobuf::libprotobuf gRPC::grpc++)
 
-# ---- MQTT (existing) ----
+# ---- MQTT ----
 find_library(PAHO_CPP_LIB paho-mqttpp3 REQUIRED)
 find_library(PAHO_C_LIB paho-mqtt3a REQUIRED)
 
@@ -63,12 +63,9 @@ target_include_directories(Poneglyph PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/rpc
 )
 
-# Link Paho MQTT C++ and C (Debian/Ubuntu packages provide these)
-find_library(PAHO_CPP_LIB paho-mqttpp3)
-find_library(PAHO_C_LIB paho-mqtt3a)
-
+# Verify MQTT libraries are found
 if (NOT PAHO_CPP_LIB OR NOT PAHO_C_LIB)
-    message(FATAL_ERROR "Paho MQTT libraries not found. Install libpaho-mqttpp3-dev and libpaho-mqtt-dev.")
+    message(FATAL_ERROR "Paho MQTT libraries not found. Install libpaho-mqttpp-dev and libpaho-mqtt-dev.")
 endif ()
 
 target_link_libraries(Poneglyph
