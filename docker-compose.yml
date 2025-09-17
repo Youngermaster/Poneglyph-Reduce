@@ -1,22 +1,23 @@
 services:
   master:
     build: ./Road-Poneglyph
-    container_name: road-poneglyph
+    container_name: ${MASTER_CONTAINER_NAME}
     ports:
-      - "8080:8080"
-      - "50051:50051"
+      - "${MASTER_HTTP_PORT}:8080"
+      - "${MASTER_GRPC_PORT}:50051"
     environment:
-      - MQTT_BROKER=tcp://mqtt:1883
-      - MQTT_USERNAME=admin
-      - MQTT_PASSWORD=public
-      - REDIS_URL=redis://redis:6379
-      - GRPC_PORT=50051
-      # AWS S3 Configuration (uncomment and configure for S3 storage)
-      # - AWS_S3_BUCKET=your-mapreduce-results-bucket
-      # - AWS_S3_BASE_PATH=mapreduce-results/
-      # - AWS_REGION=us-east-1
-      # - AWS_ACCESS_KEY_ID=your-access-key-id
-      # - AWS_SECRET_ACCESS_KEY=your-secret-access-key
+      - MQTT_BROKER=tcp://mqtt:${MQTT_PORT}
+      - MQTT_USERNAME=${MQTT_USERNAME}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+      - REDIS_URL=redis://redis:${REDIS_PORT}
+      - GRPC_PORT=${MASTER_GRPC_PORT}
+      # AWS S3 Configuration (using .env variables)
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
+      - AWS_S3_BASE_PATH=${AWS_S3_BASE_PATH}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
     depends_on:
       - mqtt
       - redis
@@ -28,11 +29,11 @@ services:
       - mqtt
     environment:
       PONEGLYPH_MASTER_URL: http://master:8080
-      MQTT_BROKER: tcp://mqtt:1883
-      MQTT_USERNAME: admin
-      MQTT_PASSWORD: public
+      MQTT_BROKER: tcp://mqtt:${MQTT_PORT}
+      MQTT_USERNAME: ${MQTT_USERNAME}
+      MQTT_PASSWORD: ${MQTT_PASSWORD}
       PONEGLYPH_USE_GRPC: "1"
-      PONEGLYPH_MASTER_GRPC: master:50051
+      PONEGLYPH_MASTER_GRPC: master:${MASTER_GRPC_PORT}
 
   client:
     build: ./Clover
@@ -44,44 +45,44 @@ services:
 
   dashboard:
     build: ./dashboard
-    container_name: dashboard
+    container_name: ${DASHBOARD_CONTAINER_NAME}
     ports:
-      - "3000:5173"
+      - "${DASHBOARD_PORT}:${DASHBOARD_INTERNAL_PORT}"
     depends_on:
       - mqtt
       - master
     environment:
-      - VITE_MQTT_HOST=localhost
-      - VITE_MQTT_PORT=8083
-      - VITE_MASTER_API=http://localhost:8080
+      - VITE_MQTT_HOST=${VITE_MQTT_HOST}
+      - VITE_MQTT_PORT=${VITE_MQTT_PORT}
+      - VITE_MASTER_API=${MASTER_API_URL}
 
   mqtt:
     image: emqx
-    container_name: emqx
+    container_name: ${MQTT_CONTAINER_NAME}
     ports:
-      - "1883:1883" # MQTT
-      - "8083:8083" # MQTT over WebSocket
-      - "18083:18083" # EMQX Dashboard
+      - "${MQTT_PORT}:1883" # MQTT
+      - "${MQTT_WS_PORT}:8083" # MQTT over WebSocket
+      - "${MQTT_DASHBOARD_PORT}:18083" # EMQX Dashboard
     environment:
-      - EMQX_DASHBOARD__DEFAULT_USERNAME=admin
-      - EMQX_DASHBOARD__DEFAULT_PASSWORD=public
+      - EMQX_DASHBOARD__DEFAULT_USERNAME=${MQTT_USERNAME}
+      - EMQX_DASHBOARD__DEFAULT_PASSWORD=${MQTT_PASSWORD}
 
   redis:
     image: redis:7-alpine
-    container_name: redis
+    container_name: ${REDIS_CONTAINER_NAME}
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:6379"
     volumes:
       - redis-data:/data
 
   redisinsight:
     image: redis/redisinsight:latest
-    container_name: redisinsight
+    container_name: ${REDISINSIGHT_CONTAINER_NAME}
     depends_on:
       - redis
     ports:
-      - "5540:5540"
+      - "${REDISINSIGHT_PORT}:5540"
 
 volumes:
   redis-data:
