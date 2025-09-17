@@ -5,7 +5,7 @@ import model.JobCtx;
 import model.JobSpec;
 import model.Worker;
 import redis.clients.jedis.JedisPooled;
-// import utils.S3Utils;
+import utils.S3Utils;
 
 import java.util.List;
 import java.util.Map;
@@ -79,15 +79,13 @@ public final class RedisStore implements AutoCloseable {
         if (jedis == null) return;
         jedis.set("gridmr:jobs:" + jobId + ":result", output);
 
-        // Also store in S3 (commented out for testing)
-        // storeResultInS3(jobId, output);
+        // Also store in S3
+        storeResultInS3(jobId, output);
     }
 
     /**
      * Store job result in AWS S3 with Redis metadata.
-     * This method is commented out for testing but ready to use.
      */
-    /*
     private void storeResultInS3(String jobId, String output) {
         try {
             S3Utils s3Utils = S3Utils.fromEnvironment();
@@ -134,7 +132,6 @@ public final class RedisStore implements AutoCloseable {
             System.err.println("[REDIS-S3 ERROR] Failed to store result in S3: " + e.getMessage());
         }
     }
-    */
     @Override
     public void close() {
         try {

@@ -3,7 +3,7 @@ package core;
 import model.JobCtx;
 import model.Task;
 import model.TaskType;
-// import utils.S3Utils;
+import utils.S3Utils;
 
 import java.nio.charset.StandardCharsets;
 import java.io.File;
@@ -80,8 +80,8 @@ public class Scheduler {
             }
             System.out.println("[RESULT STORED] " + f.getAbsolutePath());
 
-            // Store in AWS S3 (commented out for testing)
-            // storeResultInS3(ctx);
+            // Store in AWS S3
+            storeResultInS3(ctx);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -90,9 +90,7 @@ public class Scheduler {
 
     /**
      * Store job result in AWS S3 using S3Utils.
-     * This method is commented out for testing but ready to use.
      */
-    /* 
     private static void storeResultInS3(JobCtx ctx) {
         try {
             S3Utils s3Utils = S3Utils.fromEnvironment();
@@ -136,5 +134,4 @@ public class Scheduler {
             e.printStackTrace();
         }
     }
-    */
 }
