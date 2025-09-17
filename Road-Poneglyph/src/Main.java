@@ -50,6 +50,18 @@ public class Main {
         // Workers
         server.createContext("/api/workers/register", new WorkersApi.RegisterHandler(workers, mqtt, redis));
         server.createContext("/api/workers/heartbeat", new WorkersApi.HeartbeatHandler(workers, mqtt));
+        server.createContext("/api/workers", ex -> {
+            // Handle CORS preflight requests
+            if (HttpUtils.handleCorsPreflightRequest(ex)) {
+                return;
+            }
+            
+            if (!"GET".equals(ex.getRequestMethod())) {
+                HttpUtils.respond(ex, 405, "", "");
+                return;
+            }
+            HttpUtils.respondJson(ex, 200, workers.values());
+        });
 
         // Jobs
         server.createContext("/api/jobs", new JobsApi.SubmitHandler(jobs, smartScheduler, mqtt, redis));
@@ -64,6 +76,11 @@ public class Main {
 
         // Scheduler stats
         server.createContext("/api/scheduler/stats", ex -> {
+            // Handle CORS preflight requests
+            if (HttpUtils.handleCorsPreflightRequest(ex)) {
+                return;
+            }
+            
             if (!"GET".equals(ex.getRequestMethod())) {
                 HttpUtils.respond(ex, 405, "", "");
                 return;

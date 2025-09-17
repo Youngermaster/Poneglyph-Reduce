@@ -1,4 +1,5 @@
 #include "mqtt.hpp"
+
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
@@ -23,7 +24,14 @@ namespace telemetry {
 
     MqttClientManager::MqttClientManager(std::string broker, std::string username, std::string password)
         : broker_(std::move(broker)), username_(std::move(username)), password_(std::move(password)) {
-        client_ = std::make_unique<mqtt::async_client>(broker_, "poneglyph-worker-" + std::to_string(std::rand()));
+        // Generate truly unique client ID using high-resolution time + random seed
+        auto now = std::chrono::high_resolution_clock::now();
+        auto timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
+        std::srand(static_cast<unsigned int>(timestamp));
+
+        std::string uniqueId = "poneglyph-worker-" + std::to_string(timestamp) + "-" + std::to_string(std::rand());
+        client_ = std::make_unique<mqtt::async_client>(broker_, uniqueId);
+        std::cout << "[MQTT/C++] Using client ID: " << uniqueId << std::endl;
 
         conn_opts_.set_clean_session(true);
         if (!username_.empty()) {
