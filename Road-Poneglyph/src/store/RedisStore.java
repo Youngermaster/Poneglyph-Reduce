@@ -50,6 +50,43 @@ public final class RedisStore implements AutoCloseable {
         ));
     }
 
+    public void removeWorker(String workerId) {
+        if (jedis == null) return;
+        String key = "gridmr:workers:" + workerId;
+        jedis.del(key);
+        System.out.println("[REDIS] Removed worker: " + workerId);
+    }
+
+    public void cleanupStaleWorkers(long staleThresholdMs) {
+        if (jedis == null) return;
+        try {
+            // Get all worker keys
+            var workerKeys = jedis.keys("gridmr:workers:*");
+            long currentTime = System.currentTimeMillis();
+            int removedCount = 0;
+
+            for (String key : workerKeys) {
+                String lastHeartbeatStr = jedis.hget(key, "lastHeartbeat");
+                if (lastHeartbeatStr != null) {
+                    long lastHeartbeat = Long.parseLong(lastHeartbeatStr);
+                    if (currentTime - lastHeartbeat > staleThresholdMs) {
+                        String workerId = jedis.hget(key, "workerId");
+                        jedis.del(key);
+                        removedCount++;
+                        System.out.println("[REDIS] Cleaned up stale worker: " + workerId +
+                                " (last heartbeat: " + (currentTime - lastHeartbeat) + "ms ago)");
+                    }
+                }
+            }
+
+            if (removedCount > 0) {
+                System.out.println("[REDIS] Cleaned up " + removedCount + " stale workers");
+            }
+        } catch (Exception e) {
+            System.err.println("[REDIS] Error cleaning up stale workers: " + e.getMessage());
+        }
+    }
+
     // --- Jobs ---
     public void saveJobSpec(JobSpec spec) {
         if (jedis == null) return;
@@ -93,17 +130,17 @@ public final class RedisStore implements AutoCloseable {
                 System.out.println("[REDIS-S3] S3 storage not configured - skipping S3 upload");
                 return;
             }
-            
+
             if (!s3Utils.isBucketAccessible()) {
                 System.err.println("[REDIS-S3] Bucket not accessible - skipping S3 upload");
                 return;
             }
-            
+
             // Retrieve additional metadata from Redis
             Map<String, String> metadata = new java.util.HashMap<>();
             metadata.put("storage-source", "redis-store");
             metadata.put("stored-timestamp", String.valueOf(System.currentTimeMillis()));
-            
+
             // Get job counters if available
             String countersKey = "gridmr:jobs:" + jobId + ":counters";
             Map<String, String> counters = jedis.hgetAll(countersKey);
@@ -111,27 +148,28 @@ public final class RedisStore implements AutoCloseable {
                 metadata.put("maps-completed", counters.getOrDefault("maps_completed", "0"));
                 metadata.put("reduces-completed", counters.getOrDefault("reduces_completed", "0"));
             }
-            
+
             // Get job state if available
             String state = jedis.get("gridmr:jobs:" + jobId + ":state");
             if (state != null) {
                 metadata.put("job-state", state);
             }
-            
+
             // Store the result in S3
             String s3Key = s3Utils.storeJobResultWithMetadata(jobId, output, metadata);
-            
+
             // Store S3 location back in Redis for reference
             jedis.set("gridmr:jobs:" + jobId + ":s3_location", s3Key);
-            
+
             System.out.println("[REDIS-S3] Job result stored at S3: " + s3Key);
-            
+
             s3Utils.close();
-            
+
         } catch (Exception e) {
             System.err.println("[REDIS-S3 ERROR] Failed to store result in S3: " + e.getMessage());
         }
     }
+
     @Override
     public void close() {
         try {

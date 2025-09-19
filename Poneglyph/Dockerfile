@@ -1,17 +1,31 @@
 FROM debian:bookworm-slim
 
-# Install pre-built packages (much faster than building from source!)
+# Install runtime dependencies and precompiled gRPC/protobuf
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential cmake curl python3 ca-certificates git \
-    libgrpc++-dev libgrpc-dev libprotobuf-dev protobuf-compiler-grpc \
-    protobuf-compiler libssl-dev pkg-config \
-    libpaho-mqtt-dev libpaho-mqttpp-dev \
- && rm -rf /var/lib/apt/lists/*
+    # Runtime libs
+    ca-certificates \
+    libssl3 \
+    # Install gRPC/protobuf from packages
+    libgrpc++-dev \
+    libprotobuf-dev \
+    protobuf-compiler-grpc \
+    # MQTT libs from packages
+    libpaho-mqtt-dev \
+    libpaho-mqttpp-dev \
+    # Build tools (only what we need)
+    g++ \
+    cmake \
+    make \
+    && rm -rf /var/lib/apt/lists/*
 
 # --- Build worker ---
 WORKDIR /app
-COPY . /app
-RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j
+COPY . .
+
+# Single build step - much faster
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_CXX_STANDARD=20 \
+    && cmake --build build --parallel 2
 
 # Defaults
 ENV PONEGLYPH_MASTER_URL=http://master:8080

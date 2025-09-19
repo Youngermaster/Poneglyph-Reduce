@@ -33,6 +33,11 @@ public class Main {
         MqttClientManager mqtt = MqttClientManager.fromEnvOrNull();
         RedisStore redis = RedisStore.fromEnvOrNull();
 
+        // Clean up stale workers from Redis on startup (older than 5 minutes)
+        if (redis != null) {
+            redis.cleanupStaleWorkers(5 * 60 * 1000); // 5 minutes
+        }
+
         // Inicializar SmartScheduler
         smartScheduler = new SmartScheduler(pendingTasks, workers, mqtt);
 
@@ -55,7 +60,7 @@ public class Main {
             if (HttpUtils.handleCorsPreflightRequest(ex)) {
                 return;
             }
-            
+
             if (!"GET".equals(ex.getRequestMethod())) {
                 HttpUtils.respond(ex, 405, "", "");
                 return;
@@ -80,7 +85,7 @@ public class Main {
             if (HttpUtils.handleCorsPreflightRequest(ex)) {
                 return;
             }
-            
+
             if (!"GET".equals(ex.getRequestMethod())) {
                 HttpUtils.respond(ex, 405, "", "");
                 return;
@@ -104,6 +109,28 @@ public class Main {
                 .build()
                 .start();
         System.out.println("Road-Poneglyph gRPC listening on :" + grpcPort);
+
+        // Start a periodic worker cleanup task
+        if (redis != null) {
+            ScheduledExecutorService cleanupExecutor = Executors.newScheduledThreadPool(1);
+            cleanupExecutor.scheduleAtFixedRate(() -> {
+                try {
+                    // Remove workers that haven't sent heartbeat in the last 2 minutes
+                    long staleThreshold = 2 * 60 * 1000; // 2 minutes
+                    workers.entrySet().removeIf(entry -> {
+                        Worker worker = entry.getValue();
+                        if (System.currentTimeMillis() - worker.lastHeartbeat > staleThreshold) {
+                            System.out.println("[CLEANUP] Removing stale worker: " + worker.workerId);
+                            redis.removeWorker(worker.workerId);
+                            return true;
+                        }
+                        return false;
+                    });
+                } catch (Exception e) {
+                    System.err.println("[CLEANUP] Error during worker cleanup: " + e.getMessage());
+                }
+            }, 60, 60, TimeUnit.SECONDS); // Run every 60 seconds, start after 60 seconds
+        }
 
         // Graceful shutdown
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
