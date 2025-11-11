@@ -33,6 +33,11 @@ public final class WorkersApi {
 
         @Override
         public void handle(HttpExchange ex) throws IOException {
+            // Handle CORS preflight requests
+            if (HttpUtils.handleCorsPreflightRequest(ex)) {
+                return;
+            }
+            
             if (!"POST".equals(ex.getRequestMethod())) {
                 HttpUtils.respond(ex, 405, "", "");
                 return;

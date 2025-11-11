@@ -41,6 +41,11 @@ public final class JobsApi {
 
         @Override
         public void handle(HttpExchange ex) throws IOException {
+            // Handle CORS preflight requests
+            if (HttpUtils.handleCorsPreflightRequest(ex)) {
+                return;
+            }
+            
             if ("POST".equals(ex.getRequestMethod())) {
                 String body = HttpUtils.readBody(ex);
                 JobSpec spec = gson.fromJson(body, JobSpec.class);
@@ -96,6 +101,11 @@ public final class JobsApi {
 
         @Override
         public void handle(HttpExchange ex) throws IOException {
+            // Handle CORS preflight requests
+            if (HttpUtils.handleCorsPreflightRequest(ex)) {
+                return;
+            }
+            
             String q = ex.getRequestURI().getQuery();
             String jobId = (q != null && q.startsWith("job_id=")) ? q.substring("job_id=".length()) : null;
             JobCtx ctx = (jobId != null) ? jobs.get(jobId) : null;

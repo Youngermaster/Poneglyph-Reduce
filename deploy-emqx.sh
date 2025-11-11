@@ -5,12 +5,12 @@
 # Machine: 54.146.208.48
 # ===========================================
 
-echo "🚀 Deploying Poneglyph-Reduce EMQX on $(hostname)"
+echo " Deploying Poneglyph-Reduce EMQX on $(hostname)"
 echo "=============================================="
 
 # Clone repository if not exists
 if [ ! -d "Poneglyph-Reduce" ]; then
-    echo "📂 Cloning repository..."
+    echo " Cloning repository..."
     git clone https://github.com/Youngermaster/Poneglyph-Reduce.git
 fi
 
@@ -62,18 +62,18 @@ AWS_SECRET_ACCESS_KEY=
 AWS_SESSION_TOKEN=
 EOF
 
-echo "🔧 Building and starting EMQX services..."
+echo "Building and starting EMQX services..."
 docker compose up mqtt --build -d
 
-echo "✅ EMQX deployment complete!"
+echo "EMQX deployment complete!"
 echo ""
-echo "📋 EMQX services running:"
+echo "EMQX services running:"
 echo "  - MQTT Broker: tcp://54.146.208.48:1883"
 echo "  - MQTT WebSocket: ws://54.146.208.48:8083"
 echo "  - EMQX Dashboard: http://54.146.208.48:18083"
 echo "  - Username: admin"
 echo "  - Password: password123"
 echo ""
-echo "🔍 Check logs: docker compose logs mqtt"
-echo "🌐 Test MQTT: mosquitto_pub -h 54.146.208.48 -p 1883 -t test -m 'hello'"
-echo "📊 Monitor: docker stats mqtt"
+echo "Check logs: docker compose logs mqtt"
+echo "Test MQTT: mosquitto_pub -h 54.146.208.48 -p 1883 -t test -m 'hello'"
+echo "Monitor: docker stats mqtt"

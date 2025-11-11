@@ -1,0 +1,21 @@
+# Dataset de Regresión Lineal Compleja - Version Simple
+# Formato: dataset_name x_value y_value
+
+# Dataset 1: Ventas vs Publicidad (en miles)
+ventas_publicidad 1.0 5.2
+ventas_publicidad 2.0 8.1
+ventas_publicidad 3.0 12.5
+ventas_publicidad 4.0 15.8
+ventas_publicidad 5.0 19.2
+
+# Dataset 2: Temperatura vs Consumo Energético  
+temperatura_energia 10 52
+temperatura_energia 20 45
+temperatura_energia 30 58
+temperatura_energia 40 72
+
+# Dataset 3: Precio vs Demanda (relación inversa)
+precio_demanda 10 95
+precio_demanda 20 82
+precio_demanda 30 68
+precio_demanda 40 55

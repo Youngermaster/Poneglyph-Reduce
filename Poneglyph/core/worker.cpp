@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <iostream>
+#include <mutex>
 #include <sstream>
 #include <thread>
 
@@ -25,11 +26,16 @@ long long Worker::now_ms() {
 void Worker::registerSelf() {
     auto [cpuUsage, memUsage] = getSystemMetrics();
 
+    // Generate unique worker name using timestamp
+    auto now = std::chrono::high_resolution_clock::now();
+    auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+    std::string uniqueWorkerName = "poneglyph-worker-" + std::to_string(timestamp);
+
     // Prefer gRPC if available
     if (grpc) {
         std::string wid;
         int poll_ms = 1000;
-        bool ok = grpc->RegisterWorker("poneglyph-worker", /*capacity*/ 2, wid, &poll_ms);
+        bool ok = grpc->RegisterWorker(uniqueWorkerName, /*capacity*/ 2, wid, &poll_ms);
         if (ok && !wid.empty()) {
             workerId = wid;
             std::cout << "[gRPC] Registered as " << workerId << " (poll=" << poll_ms << "ms)\n";
@@ -42,7 +48,7 @@ void Worker::registerSelf() {
         // HTTP fallback
         std::ostringstream registrationPayload;
         registrationPayload << "{"
-                << "\"name\":\"poneglyph-worker\","
+                << "\"name\":\"" << uniqueWorkerName << "\","
                 << "\"capacity\":2," // Capacidad de tareas concurrentes
                 << "\"cpu_usage\":" << cpuUsage << ","
                 << "\"memory_usage\":" << memUsage
@@ -55,7 +61,7 @@ void Worker::registerSelf() {
     if (mqtt) {
         std::ostringstream j;
         j << "{\"workerId\":\"" << workerId << "\","
-                << "\"name\":\"poneglyph-worker\",\"capacity\":2,"
+                << "\"name\":\"" << uniqueWorkerName << "\",\"capacity\":2,"
                 << "\"ts\":" << now_ms() << "}";
         mqtt->publish_json("gridmr/worker/registered", j.str());
     }
@@ -95,8 +101,19 @@ std::pair<double, double> Worker::getSystemMetrics() {
     // Implementación básica de métricas del sistema
     // En un sistema real, esto leería /proc/stat, /proc/meminfo, etc.
 
-    double cpuUsage = 0.1 + (rand() % 30) / 100.0; // Simular 10-40% CPU
-    double memUsage = 0.2 + (rand() % 40) / 100.0; // Simular 20-60% memoria
+    // Initialize random seed if not done yet (thread-safe)
+    static std::once_flag flag;
+    std::call_once(flag, []() {
+        auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+        std::srand(static_cast<unsigned int>(seed));
+    });
+
+    // Add small random variation based on worker instance
+    auto now = std::chrono::steady_clock::now().time_since_epoch().count();
+    double baseVariation = (now % 1000) / 1000.0; // 0.0-0.999
+
+    double cpuUsage = 0.1 + (rand() % 30) / 100.0 + baseVariation * 0.05; // 10-45% CPU
+    double memUsage = 0.2 + (rand() % 40) / 100.0 + baseVariation * 0.05; // 20-65% memoria
 
     return {cpuUsage, memUsage};
 }
@@ -205,19 +222,25 @@ int Worker::run() {
         if (grpc) {
             gridmr::TaskAssignment ta;
             if (!grpc->NextTask(workerId, ta)) {
+                std::cout << "[Worker " << workerId << "] gRPC NextTask failed" << std::endl;
                 std::this_thread::sleep_for(std::chrono::milliseconds(800));
                 continue;
             }
             if (!ta.has_task()) {
+                // std::cout << "[Worker " << workerId << "] No tasks available" << std::endl;
                 std::this_thread::sleep_for(std::chrono::milliseconds(800));
                 continue;
             }
-            if (ta.has_map())
+            if (ta.has_map()) {
+                std::cout << "[Worker " << workerId << "] Received MAP task: " << ta.map().task_id() << std::endl;
                 handleMapGrpc(ta.map());
-            else if (ta.has_reduce())
+            } else if (ta.has_reduce()) {
+                std::cout << "[Worker " << workerId << "] Received REDUCE task: " << ta.reduce().task_id() << std::endl;
                 handleReduceGrpc(ta.reduce());
-            else
+            } else {
+                std::cout << "[Worker " << workerId << "] Unknown task type" << std::endl;
                 std::this_thread::sleep_for(std::chrono::milliseconds(300));
+            }
             continue;
         }
 

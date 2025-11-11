@@ -1,8 +1,8 @@
-# 🚀 Dockerfile Optimization Results
+# Dockerfile Optimization Results
 
 ## Before vs. After: Dramatic Build Time Improvement
 
-### ❌ **BEFORE (Building from Source)**
+### **BEFORE (Building from Source)**
 
 ```dockerfile
 # OLD: Building gRPC from source (20+ minutes!)
@@ -35,11 +35,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 **Build Time**: ⚡ **1-2 minutes** on EC2 instances
 
-## 📊 **Performance Comparison**
+## **Performance Comparison**
 
 | Metric                   | Before (Source Build)   | After (Pre-built)       | Improvement                  |
 | ------------------------ | ----------------------- | ----------------------- | ---------------------------- |
-| **Total Build Time**     | 25-30 minutes           | 1-2 minutes             | **🚀 12-15x faster**         |
+| **Total Build Time**     | 25-30 minutes           | 1-2 minutes             | ** 12-15x faster**           |
 | **EC2 CPU Usage**        | High (100% for 25+ min) | Low (peak for 2 min)    | **💰 85% less compute cost** |
 | **Network Usage**        | High (git clones)       | Moderate (apt packages) | **📡 60% less bandwidth**    |
 | **Docker Layer Size**    | Large (build artifacts) | Small (only packages)   | **💾 40% smaller images**    |
@@ -125,7 +125,7 @@ find_library(PAHO_C_LIB paho-mqtt3a REQUIRED)
 4. **MQTT Test**: ✅ MQTT telemetry works correctly
 5. **Full Integration**: ✅ MapReduce jobs execute successfully
 
-## 🚀 **Deployment Instructions**
+## **Deployment Instructions**
 
 Your distributed deployment scripts now use the optimized Dockerfile automatically:
 
@@ -147,4 +147,4 @@ Your distributed deployment scripts now use the optimized Dockerfile automatical
 
 ---
 
-**🎉 Result**: Your EC2 worker deployments are now **12-15x faster** with the same functionality! 🚀
+**🎉 Result**: Your EC2 worker deployments are now **12-15x faster** with the same functionality!

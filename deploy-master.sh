@@ -5,12 +5,12 @@
 # Machine: 107.21.170.137
 # ===========================================
 
-echo "🚀 Deploying Poneglyph-Reduce Master on $(hostname)"
+echo " Deploying Poneglyph-Reduce Master on $(hostname)"
 echo "=============================================="
 
 # Clone repository if not exists
 if [ ! -d "Poneglyph-Reduce" ]; then
-    echo "📂 Cloning repository..."
+    echo " Cloning repository..."
     git clone https://github.com/Youngermaster/Poneglyph-Reduce.git
 fi
 
@@ -59,15 +59,15 @@ AWS_SECRET_ACCESS_KEY=
 AWS_SESSION_TOKEN=
 EOF
 
-echo "🔧 Building and starting Master services..."
+echo "Building and starting Master services..."
 docker compose up master redis redisinsight --build -d
 
-echo "✅ Master deployment complete!"
+echo "Master deployment complete!"
 echo ""
-echo "📋 Master services running:"
+echo "Master services running:"
 echo "  - Master API: http://107.21.170.137:8080"
 echo "  - Redis: 13.218.171.16:6379"
 echo "  - RedisInsight: http://107.21.170.137:5540"
 echo ""
-echo "🔍 Check logs: docker compose logs master"
-echo "🌐 Test API: curl http://107.21.170.137:8080/api/health"
+echo "Check logs: docker compose logs master"
+echo "Test API: curl http://107.21.170.137:8080/api/health"

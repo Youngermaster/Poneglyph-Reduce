@@ -131,11 +131,11 @@
       ansible.builtin.debug:
         msg: |
           ========================================
-          🎉 EC2 Setup Complete! 🎉
+          EC2 Setup Complete!
           ========================================
-          ✅ Docker installed and running
-          ✅ Repository cloned to /opt/poneglyph-reduce
-          ✅ User {{ ansible_user }} added to docker group
+          Docker installed and running
+          Repository cloned to /opt/poneglyph-reduce
+          User {{ ansible_user }} added to docker group
 
           Next steps:
           1. SSH to your EC2 instance

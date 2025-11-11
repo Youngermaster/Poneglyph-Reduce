@@ -125,7 +125,7 @@ public final class TasksApi {
                 }
 
                 if (ctx.completedMaps == ctx.mapTasks.size()) {
-                    // build reduce tasks only for non-empty partitions
+                    // build reduce tasks for ALL partitions (including empty ones)
                     int rIx = 0;
                     ctx.reduceTasks.clear();
                     var sizes = new java.util.ArrayList<Integer>();
@@ -133,7 +133,7 @@ public final class TasksApi {
                     for (int i = 0; i < ctx.spec.reducers; i++) {
                         int sz = ctx.partitionKV.get(i).size();
                         sizes.add(sz);
-                        if (sz == 0) continue;
+                        // Create reduce tasks for ALL partitions, including empty ones
 
                         Task rt = new Task();
                         rt.type = TaskType.REDUCE;
@@ -331,7 +331,7 @@ public final class TasksApi {
                 }
 
                 if (ctx.completedMaps == ctx.mapTasks.size()) {
-                    // build reduce tasks only for non-empty partitions
+                    // build reduce tasks for ALL partitions (including empty ones)
                     int rIx = 0;
                     ctx.reduceTasks.clear();
                     var sizes = new java.util.ArrayList<Integer>();
@@ -339,7 +339,7 @@ public final class TasksApi {
                     for (int i = 0; i < ctx.spec.reducers; i++) {
                         int sz = ctx.partitionKV.get(i).size();
                         sizes.add(sz);
-                        if (sz == 0) continue;
+                        // Create reduce tasks for ALL partitions, including empty ones
 
                         Task rt = new Task();
                         rt.type = TaskType.REDUCE;

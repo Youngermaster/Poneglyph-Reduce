@@ -64,14 +64,14 @@ public class MasterService extends MasterGrpc.MasterImplBase {
     public void nextTask(NextTaskRequest req, StreamObserver<TaskAssignment> respObs) {
         String workerId = req.getWorkerId();
         Task task = null;
-        
+
         // Use SmartScheduler if available, otherwise fall back to basic scheduler
         if (scheduler instanceof SmartScheduler) {
             task = ((SmartScheduler) scheduler).getNextTaskForWorker(workerId);
         } else {
             task = pending.poll();
         }
-        
+
         if (task == null) {
             respObs.onNext(TaskAssignment.newBuilder().setHasTask(false).build());
             respObs.onCompleted();
@@ -131,7 +131,7 @@ public class MasterService extends MasterGrpc.MasterImplBase {
         }
         ctx.completedMaps++;
         System.out.println("[MAP COMPLETE gRPC] job=" + jobId + " task=" + req.getTaskId() + " kvAdded=" + added);
-        
+
         // Notify SmartScheduler if available
         if (scheduler instanceof SmartScheduler) {
             ((SmartScheduler) scheduler).onTaskCompleted(req.getTaskId(), req.getWorkerId());
@@ -154,7 +154,7 @@ public class MasterService extends MasterGrpc.MasterImplBase {
             for (int i = 0; i < ctx.spec.reducers; i++) {
                 int sz = ctx.partitionKV.get(i).size();
                 sizes.add(sz);
-                if (sz == 0) continue;
+                // Create reduce tasks for ALL partitions, including empty ones
                 Task rt = new Task();
                 rt.type = TaskType.REDUCE;
                 rt.taskId = "reduce-" + (rIx++);
@@ -204,7 +204,7 @@ public class MasterService extends MasterGrpc.MasterImplBase {
         String out = req.getOutput();
         ctx.completedReduces++;
         ctx.finalOutput += out + (out.endsWith("\n") ? "" : "\n");
-        
+
         // Notify SmartScheduler if available
         if (scheduler instanceof SmartScheduler) {
             ((SmartScheduler) scheduler).onTaskCompleted(req.getTaskId(), req.getWorkerId());
