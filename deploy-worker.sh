@@ -5,12 +5,12 @@
 # Machines: 54.221.98.28, 54.82.114.105, 3.89.106.235
 # ===========================================
 
-echo "🚀 Deploying Poneglyph-Reduce Worker on $(hostname)"
+echo " Deploying Poneglyph-Reduce Worker on $(hostname)"
 echo "=============================================="
 
 # Clone repository if not exists
 if [ ! -d "Poneglyph-Reduce" ]; then
-    echo "📂 Cloning repository..."
+    echo " Cloning repository..."
     git clone https://github.com/Youngermaster/Poneglyph-Reduce.git
 fi
 
@@ -62,14 +62,14 @@ AWS_SECRET_ACCESS_KEY=
 AWS_SESSION_TOKEN=
 EOF
 
-echo "🔧 Building and starting Worker service..."
+echo "Building and starting Worker service..."
 docker compose up worker --build -d
 
-echo "✅ Worker deployment complete!"
+echo "Worker deployment complete!"
 echo ""
-echo "📋 Worker services running:"
+echo "Worker services running:"
 echo "  - Worker connected to Master: http://107.21.170.137:8080"
 echo "  - MQTT Broker: tcp://54.146.208.48:1883"
 echo ""
-echo "🔍 Check logs: docker compose logs worker"
-echo "📊 Monitor: docker stats"
+echo "Check logs: docker compose logs worker"
+echo "Monitor: docker stats"

@@ -61,4 +61,12 @@ public class Worker {
     public void onTaskAssigned() {
         activeTasks++;
     }
+    
+    /**
+     * Maneja una tarea fallida (timeout o worker muerto).
+     */
+    public void onTaskFailed() {
+        activeTasks = Math.max(0, activeTasks - 1);
+        // No incrementar completedTasks ya que la tarea falló
+    }
 }

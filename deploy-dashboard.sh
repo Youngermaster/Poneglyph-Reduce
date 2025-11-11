@@ -5,12 +5,12 @@
 # Machine: 13.222.179.191
 # ===========================================
 
-echo "🚀 Deploying Poneglyph-Reduce Dashboard on $(hostname)"
+echo " Deploying Poneglyph-Reduce Dashboard on $(hostname)"
 echo "=============================================="
 
 # Clone repository if not exists
 if [ ! -d "Poneglyph-Reduce" ]; then
-    echo "📂 Cloning repository..."
+    echo " Cloning repository..."
     git clone https://github.com/Youngermaster/Poneglyph-Reduce.git
 fi
 
@@ -62,16 +62,16 @@ AWS_SECRET_ACCESS_KEY=
 AWS_SESSION_TOKEN=
 EOF
 
-echo "🔧 Building and starting Dashboard services..."
+echo "Building and starting Dashboard services..."
 docker compose up dashboard --build -d
 
-echo "✅ Dashboard deployment complete!"
+echo "Dashboard deployment complete!"
 echo ""
-echo "📋 Dashboard services running:"
+echo "Dashboard services running:"
 echo "  - Dashboard: http://13.222.179.191:3000"
 echo "  - Connected to Master: http://107.21.170.137:8080"
 echo "  - Connected to MQTT: ws://54.146.208.48:8083"
 echo ""
-echo "🔍 Check logs: docker compose logs dashboard"
-echo "🌐 Access Dashboard: http://13.222.179.191:3000"
-echo "📊 Monitor: docker stats dashboard"
+echo "Check logs: docker compose logs dashboard"
+echo "Access Dashboard: http://13.222.179.191:3000"
+echo "Monitor: docker stats dashboard"

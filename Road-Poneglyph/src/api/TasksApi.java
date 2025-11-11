@@ -331,7 +331,7 @@ public final class TasksApi {
                 }
 
                 if (ctx.completedMaps == ctx.mapTasks.size()) {
-                    // build reduce tasks only for non-empty partitions
+                    // build reduce tasks for ALL partitions (including empty ones)
                     int rIx = 0;
                     ctx.reduceTasks.clear();
                     var sizes = new java.util.ArrayList<Integer>();

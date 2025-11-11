@@ -5,12 +5,12 @@
 # Machine: 13.218.171.16
 # ===========================================
 
-echo "🚀 Deploying Poneglyph-Reduce Redis on $(hostname)"
+echo " Deploying Poneglyph-Reduce Redis on $(hostname)"
 echo "=============================================="
 
 # Clone repository if not exists
 if [ ! -d "Poneglyph-Reduce" ]; then
-    echo "📂 Cloning repository..."
+    echo " Cloning repository..."
     git clone https://github.com/Youngermaster/Poneglyph-Reduce.git
 fi
 
@@ -62,15 +62,15 @@ AWS_SECRET_ACCESS_KEY=
 AWS_SESSION_TOKEN=
 EOF
 
-echo "🔧 Building and starting Redis services..."
+echo "Building and starting Redis services..."
 docker compose up redis redisinsight --build -d
 
-echo "✅ Redis deployment complete!"
+echo "Redis deployment complete!"
 echo ""
-echo "📋 Redis services running:"
+echo "Redis services running:"
 echo "  - Redis: 13.218.171.16:6379"
 echo "  - RedisInsight: http://13.218.171.16:5540"
 echo ""
-echo "🔍 Check logs: docker compose logs redis"
-echo "🌐 Test Redis: redis-cli -h 13.218.171.16 -p 6379 ping"
-echo "📊 Monitor: docker stats redis"
+echo "Check logs: docker compose logs redis"
+echo "Test Redis: redis-cli -h 13.218.171.16 -p 6379 ping"
+echo "Monitor: docker stats redis"
